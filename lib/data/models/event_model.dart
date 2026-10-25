@@ -143,8 +143,11 @@ class EventModel {
         'featured': featured,
         'tag': tag,
         'cast_crew': jsonEncode(castCrew.map((c) => c.toJson()).toList()),
-        'convenience_fee_value': convenienceFeeValue,
-        'gst_percent': gstPercent,
         'status': status,
       };
+
+  // Convenience getters for modern BookMyShow style UI
+  double get rating => (featured > 0 ? 9.4 : 8.8);
+  int get votesCount => (featured > 0 ? 14200 : 5600);
+  List<CastCrewMember> get cast => castCrew;
 }

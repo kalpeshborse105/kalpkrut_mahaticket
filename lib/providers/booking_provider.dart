@@ -54,7 +54,7 @@ class BookingProvider with ChangeNotifier {
     return '$minutes:$seconds';
   }
 
-  void initEvent(EventModel event) async {
+  Future<void> initEvent(EventModel event) async {
     _selectedEvent = event;
     _selectedSession = null;
     _selectedSeats.clear();

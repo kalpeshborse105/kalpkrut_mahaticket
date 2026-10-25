@@ -542,12 +542,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       if (result.success && result.issuedTickets.isNotEmpty) {
         if (context.mounted) {
+          final event = booking.selectedEvent;
+          final session = booking.selectedSession;
+          final dateStr = session != null ? DateFormat('EEE, d MMM yyyy').format(session.sessionStartTime) : null;
+          final timeStr = session != null ? DateFormat('hh:mm a').format(session.sessionStartTime) : null;
+
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (_) => TicketViewScreen(
                 order: result.order!,
                 tickets: result.issuedTickets,
+                eventTitle: event?.title,
+                venueName: session?.hallName ?? 'Main Auditorium',
+                showDate: dateStr,
+                showTime: timeStr,
               ),
             ),
           );

@@ -8,11 +8,19 @@ import '../../data/models/ticket_model.dart';
 class TicketViewScreen extends StatelessWidget {
   final OrderModel order;
   final List<TicketModel> tickets;
+  final String? eventTitle;
+  final String? venueName;
+  final String? showDate;
+  final String? showTime;
 
   const TicketViewScreen({
     super.key,
     required this.order,
     required this.tickets,
+    this.eventTitle,
+    this.venueName,
+    this.showDate,
+    this.showTime,
   });
 
   @override
@@ -166,6 +174,57 @@ class TicketViewScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (eventTitle != null && eventTitle!.isNotEmpty) ...[
+                  Text(
+                    eventTitle!,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                if (venueName != null && venueName!.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 14, color: AppColors.primary),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          venueName!,
+                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if ((showDate != null && showDate!.isNotEmpty) || (showTime != null && showTime!.isNotEmpty)) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withAlpha(25),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.primary.withAlpha(50)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.access_time_filled, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${showDate ?? ''} • ${showTime ?? ''}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

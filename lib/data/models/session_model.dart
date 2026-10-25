@@ -3,6 +3,8 @@ class SessionModel {
   final int eventId;
   final DateTime sessionStartTime;
   final DateTime sessionEndTime;
+  final String? hallName;
+  final String? hallNameMr;
   final String status;
 
   SessionModel({
@@ -10,6 +12,8 @@ class SessionModel {
     required this.eventId,
     required this.sessionStartTime,
     required this.sessionEndTime,
+    this.hallName = 'Main Auditorium (मुख्य प्रेक्षागृह)',
+    this.hallNameMr,
     this.status = 'active',
   });
 
@@ -20,6 +24,8 @@ class SessionModel {
       sessionStartTime: DateTime.tryParse(json['session_start_time'] ?? '') ?? DateTime.now(),
       sessionEndTime: DateTime.tryParse(json['session_end_time'] ?? '') ??
           DateTime.now().add(const Duration(hours: 2, minutes: 30)),
+      hallName: json['hall_name'] ?? 'Main Auditorium (मुख्य प्रेक्षागृह)',
+      hallNameMr: json['hall_name_mr'],
       status: json['status'] ?? 'active',
     );
   }
@@ -29,6 +35,8 @@ class SessionModel {
         'event_id': eventId,
         'session_start_time': sessionStartTime.toIso8601String(),
         'session_end_time': sessionEndTime.toIso8601String(),
+        'hall_name': hallName,
+        'hall_name_mr': hallNameMr,
         'status': status,
       };
 }

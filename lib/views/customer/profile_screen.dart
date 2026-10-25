@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../providers/auth_provider.dart';
 import '../admin/admin_dashboard_screen.dart';
 import '../admin/organizer_console_screen.dart';
 import '../admin/qr_gate_scanner_screen.dart';
@@ -16,15 +18,34 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String _currentRole = 'customer'; // 'customer', 'organizer', 'super_admin'
-  final String _userName = 'कल्पेश बोरसे (Kalpesh Borse)';
-  final String _userEmail = 'kalpesh@kalpkrut.com';
-  final String _userPhone = '+91 98765 43210';
   String _selectedLanguage = 'मराठी (Marathi)';
 
+  String _roleToString(UserRole role) {
+    switch (role) {
+      case UserRole.superAdmin:
+        return 'super_admin';
+      case UserRole.organizer:
+        return 'organizer';
+      default:
+        return 'customer';
+    }
+  }
+
+  UserRole _stringToRole(String role) {
+    switch (role) {
+      case 'super_admin':
+        return UserRole.superAdmin;
+      case 'organizer':
+        return UserRole.organizer;
+      default:
+        return UserRole.customer;
+    }
+  }
+
   void _showRoleSwitcherDialog() {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
     final pinController = TextEditingController();
-    String tempRole = _currentRole;
+    String tempRole = _roleToString(auth.role);
     String? errorMessage;
 
     showDialog(
@@ -131,7 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                  onPressed: () {
+                  onPressed: () async {
                     if (tempRole == 'super_admin') {
                       if (pinController.text.trim() != 'Admin2026') {
                         setDialogState(() {
@@ -141,11 +162,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       }
                     }
 
-                    setState(() => _currentRole = tempRole);
-                    Navigator.pop(dialogCtx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('भूमिका बदलली: ${_getRoleLabel(_currentRole)}')),
+                    final success = await auth.switchRole(
+                      _stringToRole(tempRole),
+                      adminPin: pinController.text.trim(),
                     );
+                    if (dialogCtx.mounted) {
+                      Navigator.pop(dialogCtx);
+                    }
+                    if (!mounted) return;
+                    if (success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('भूमिका बदलली: ${_getRoleLabel(tempRole)}')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('भूमिका बदलता आली नाही (Failed to switch role)')),
+                      );
+                    }
                   },
                   child: const Text('लागू करा (Apply)'),
                 ),
@@ -220,6 +253,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final currentRoleStr = _roleToString(auth.role);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -253,15 +289,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: 60,
                         height: 60,
                         decoration: BoxDecoration(
-                          color: _getRoleColor(_currentRole).withAlpha(40),
+                          color: _getRoleColor(currentRoleStr).withAlpha(40),
                           shape: BoxShape.circle,
-                          border: Border.all(color: _getRoleColor(_currentRole), width: 2),
+                          border: Border.all(color: _getRoleColor(currentRoleStr), width: 2),
                         ),
                         child: Center(
                           child: Text(
-                            'KB',
+                            auth.userName.isNotEmpty ? auth.userName[0].toUpperCase() : 'U',
                             style: TextStyle(
-                              color: _getRoleColor(_currentRole),
+                              color: _getRoleColor(currentRoleStr),
                               fontWeight: FontWeight.bold,
                               fontSize: 22,
                             ),
@@ -274,17 +310,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _userName,
+                              auth.userName,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              _userPhone,
+                              auth.userPhone,
                               style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              _userEmail,
+                              auth.userEmail,
                               style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                             ),
                           ],
@@ -303,9 +339,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const Icon(Icons.verified_user, size: 16, color: AppColors.textSecondary),
                           const SizedBox(width: 6),
                           Text(
-                            _getRoleLabel(_currentRole),
+                            _getRoleLabel(currentRoleStr),
                             style: TextStyle(
-                              color: _getRoleColor(_currentRole),
+                              color: _getRoleColor(currentRoleStr),
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
@@ -363,7 +399,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
 
-            if (_currentRole == 'super_admin') ...[
+            if (auth.isSuperAdmin) ...[
               const SizedBox(height: 16),
               _buildSectionHeader('सुपर अ‍ॅडमिनिस्ट्रेशन (Admin Controls)'),
               _buildMenuItem(
