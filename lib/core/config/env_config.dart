@@ -1,51 +1,68 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class EnvConfig {
+  static bool _initialized = false;
+
   static Future<void> init() async {
+    if (_initialized) return;
     try {
       await dotenv.load(fileName: '.env');
     } catch (e) {
-      // Fallback if .env cannot be loaded
+      // In production web or when using --dart-define, .env may not exist
+      debugPrint('dotenv loading note: $e');
     }
+    _initialized = true;
   }
 
-  static String get appName => dotenv.get('NEXT_PUBLIC_APP_NAME', fallback: 'MahaTicket');
-  static String get defaultCity => dotenv.get('NEXT_PUBLIC_DEFAULT_CITY', fallback: 'Pune');
+  /// App name
+  static String get appName =>
+      _resolve('NEXT_PUBLIC_APP_NAME', defaultValue: 'MahaTicket');
 
-  static String get supabaseUrl => dotenv.get(
-        'NEXT_PUBLIC_SUPABASE_URL',
-        fallback: 'https://hnseawulngdxbvltmthe.supabase.co',
-      );
+  /// Default city
+  static String get defaultCity =>
+      _resolve('NEXT_PUBLIC_DEFAULT_CITY', defaultValue: 'Pune');
 
-  static String get supabaseAnonKey => dotenv.get(
-        'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-        fallback:
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhuc2Vhd3VsbmdkeGJ2bHRtdGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3MDc5NjIsImV4cCI6MjEwNjI4Mzk2Mn0.Jk1k0ZPMpldURgv37Hq1OfTjSY45GBcZ21qT_74SK9o',
-      );
+  /// Supabase project URL (Client-safe public URL)
+  static String get supabaseUrl =>
+      _resolve('NEXT_PUBLIC_SUPABASE_URL', defaultValue: 'https://hnseawulngdxbvltmthe.supabase.co');
 
-  static String get supabaseServiceRoleKey => dotenv.get(
-        'SUPABASE_SERVICE_ROLE_KEY',
-        fallback:
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhuc2Vhd3VsbmdkeGJ2bHRtdGhlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDcwNzk2MiwiZXhwIjoyMTA2MjgzOTYyfQ.elGt4aVj4BEn3cAv7VW3QnKXJGVH3sh68XDRhmnivOA',
-      );
+  /// Supabase public anonymous publishable key
+  static String get supabaseAnonKey =>
+      _resolve('NEXT_PUBLIC_SUPABASE_ANON_KEY', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhuc2Vhd3VsbmdkeGJ2bHRtdGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3MDc5NjIsImV4cCI6MjEwNjI4Mzk2Mn0.Jk1k0ZPMpldURgv37Hq1OfTjSY45GBcZ21qT_74SK9o');
 
-  static String get razorpayKeyId => dotenv.get(
-        'RAZORPAY_KEY_ID',
-        fallback: 'rzp_test_Tqadzif5eTC5UB',
-      );
+  /// Razorpay Public Key ID (Client-safe key used for checkout modal)
+  static String get razorpayKeyId =>
+      _resolve('NEXT_PUBLIC_RAZORPAY_KEY_ID', defaultValue: _resolve('RAZORPAY_KEY_ID', defaultValue: 'rzp_test_Tqadzif5eTC5UB'));
 
-  static String get razorpayKeySecret => dotenv.get(
-        'RAZORPAY_KEY_SECRET',
-        fallback: 'RLTu386XAyW7T5G6nZh0Twh2',
-      );
+  /// Helper to resolve from Dart environment definition (--dart-define) or dotenv
+  static String _resolve(String key, {String defaultValue = ''}) {
+    // 1. Try --dart-define compile-time variable
+    final fromDefine = String.fromEnvironment(key);
+    if (fromDefine.isNotEmpty) return fromDefine;
 
-  static String get ticketSecret => dotenv.get(
-        'TICKET_SECRET',
-        fallback: 'mahaticket_secure_signing_key_2026',
-      );
+    // 2. Try dotenv if loaded
+    try {
+      if (dotenv.isInitialized && dotenv.isEveryDefined([key])) {
+        final val = dotenv.get(key);
+        if (val.isNotEmpty) return val;
+      }
+    } catch (_) {}
 
-  static String get adminPassword => dotenv.get(
-        'ADMIN_PASSWORD',
-        fallback: 'Admin2026',
+    // 3. Fallback default
+    return defaultValue;
+  }
+
+  /// Check if essential client configuration is present
+  static bool get isConfigured =>
+      supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+
+  /// Throws StateError if mandatory config is missing, failing fast safely
+  static void validate() {
+    if (!isConfigured) {
+      throw StateError(
+        'Critical configuration missing! Please provide NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
       );
+    }
+  }
 }

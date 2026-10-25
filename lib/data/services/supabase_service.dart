@@ -13,7 +13,20 @@ class SupabaseService {
   factory SupabaseService() => _instance;
   SupabaseService._internal();
 
-  SupabaseClient get client => Supabase.instance.client;
+  SupabaseClient get client {
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return SupabaseClient(
+        EnvConfig.supabaseUrl.isNotEmpty
+            ? EnvConfig.supabaseUrl
+            : 'https://hnseawulngdxbvltmthe.supabase.co',
+        EnvConfig.supabaseAnonKey.isNotEmpty
+            ? EnvConfig.supabaseAnonKey
+            : 'dummy-anon-key',
+      );
+    }
+  }
 
   static Future<void> init() async {
     await Supabase.initialize(
@@ -25,12 +38,22 @@ class SupabaseService {
     );
   }
 
-  /// Fetch all active/published events
+  /// Fetch all active/published events with optional category and city filtering
   Future<List<EventModel>> getEvents({String? category, String? city}) async {
     try {
-      PostgrestFilterBuilder query = client.from('events').select('*');
+      final bool hasCity = city != null && city.isNotEmpty && city.toLowerCase() != 'all';
+      PostgrestFilterBuilder query = hasCity
+          ? client.from('events').select('*, venues!inner(city)')
+          : client.from('events').select('*, venues(city)');
 
-      if (category != null && category.isNotEmpty && category != 'all') {
+      // Respect published lifecycle status
+      query = query.eq('status', 'published');
+
+      if (hasCity) {
+        query = query.ilike('venues.city', city);
+      }
+
+      if (category != null && category.isNotEmpty && category.toLowerCase() != 'all') {
         query = query.eq('category', category);
       }
 
@@ -40,6 +63,21 @@ class SupabaseService {
       return (response as List).map((e) => EventModel.fromJson(e)).toList();
     } catch (e) {
       debugPrint('Error fetching events: $e');
+      return [];
+    }
+  }
+
+  /// Fetch venue sections for layout & tier mapping
+  Future<List<VenueSectionModel>> getVenueSections(int venueId) async {
+    try {
+      final response = await client
+          .from('venue_sections')
+          .select('*')
+          .eq('venue_id', venueId)
+          .order('id');
+      return (response as List).map((e) => VenueSectionModel.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint('Error fetching venue sections: $e');
       return [];
     }
   }
@@ -229,70 +267,38 @@ class SupabaseService {
     }
   }
 
-  /// Gate Ticket Scanner: Validate ticket code and mark used
+  /// Gate Ticket Scanner: Validate ticket code and atomically mark used via PostgreSQL RPC
   Future<Map<String, dynamic>> validateAndScanTicket({
     required String ticketCode,
     required String gateName,
     int? scannerUserId,
   }) async {
     try {
-      final ticketRows =
-          await client.from('tickets').select('*').eq('ticket_code', ticketCode);
-      if ((ticketRows as List).isEmpty) {
-        return {
-          'success': false,
-          'message': 'Invalid ticket code: not found in system',
-          'status': 'INVALID',
-        };
-      }
-
-      final ticket = TicketModel.fromJson(ticketRows.first);
-
-      if (ticket.status == 'used') {
-        return {
-          'success': false,
-          'message': 'Ticket has ALREADY BEEN SCANNED and used!',
-          'status': 'ALREADY_USED',
-          'ticket': ticket,
-        };
-      }
-
-      if (ticket.status == 'cancelled') {
-        return {
-          'success': false,
-          'message': 'Ticket has been CANCELLED',
-          'status': 'CANCELLED',
-          'ticket': ticket,
-        };
-      }
-
-      // Mark ticket as used
-      await client
-          .from('tickets')
-          .update({'status': 'used'})
-          .eq('id', ticket.id);
-
-      // Log ticket scan
-      await client.from('ticket_scans').insert({
-        'ticket_id': ticket.id,
-        'ticket_code': ticket.ticketCode,
-        'scanned_by_user_id': scannerUserId ?? 1,
-        'scanner_device': 'MahaTicket Mobile Gate Scanner',
-        'scan_result': 'SUCCESS',
-        'gate_name': gateName,
+      final cleanCode = ticketCode.trim();
+      final res = await client.rpc('scan_ticket_atomic', params: {
+        'p_ticket_code': cleanCode,
+        'p_scanner_user_id': scannerUserId ?? 1,
+        'p_gate_name': gateName,
       });
 
-      return {
-        'success': true,
-        'message': 'Entry Approved! Welcome to the show.',
-        'status': 'SUCCESS',
-        'ticket': ticket,
-      };
-    } catch (e) {
+      if (res is Map) {
+        final map = Map<String, dynamic>.from(res);
+        if (map['ticket'] != null && map['ticket'] is Map) {
+          map['ticket'] = TicketModel.fromJson(Map<String, dynamic>.from(map['ticket']));
+        }
+        return map;
+      }
       return {
         'success': false,
-        'message': 'Scanning error: $e',
         'status': 'ERROR',
+        'message': 'Unexpected scanner response from server.',
+      };
+    } catch (e) {
+      debugPrint('Error scanning ticket via RPC: $e');
+      return {
+        'success': false,
+        'status': 'ERROR',
+        'message': 'Scanning error: $e',
       };
     }
   }
@@ -473,6 +479,60 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Error toggling coupon active: $e');
       return false;
+    }
+  }
+
+  /// Validate promo coupon against real coupons database table
+  Future<Map<String, dynamic>?> validateCoupon(String code, int orderSubtotalPaise) async {
+    try {
+      final cleanCode = code.trim().toUpperCase();
+      final res = await client
+          .from('coupons')
+          .select('*')
+          .eq('code', cleanCode)
+          .eq('active', 1)
+          .maybeSingle();
+
+      if (res == null) {
+        return {
+          'valid': false,
+          'message': 'Invalid coupon code or expired.',
+        };
+      }
+
+      final minOrder = (res['min_order_value'] as int? ?? 0);
+      if (orderSubtotalPaise < minOrder) {
+        return {
+          'valid': false,
+          'message': 'Minimum order value of ₹${(minOrder / 100).toStringAsFixed(0)} required.',
+        };
+      }
+
+      final discountType = res['discount_type']?.toString();
+      final discountVal = (res['discount_value'] as int? ?? 0);
+      final maxDiscount = (res['max_discount'] as int? ?? 0);
+
+      int calculatedDiscount = 0;
+      if (discountType == 'percentage') {
+        calculatedDiscount = (orderSubtotalPaise * discountVal) ~/ 10000;
+        if (maxDiscount > 0 && calculatedDiscount > maxDiscount) {
+          calculatedDiscount = maxDiscount;
+        }
+      } else {
+        calculatedDiscount = discountVal;
+        if (calculatedDiscount > orderSubtotalPaise) calculatedDiscount = orderSubtotalPaise;
+      }
+
+      return {
+        'valid': true,
+        'code': cleanCode,
+        'discountPaise': calculatedDiscount,
+        'discountType': discountType,
+        'discountValue': discountVal,
+      };
+    } catch (e) {
+      debugPrint('Error validating coupon: $e');
+      return null;
     }
   }
 

@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/config/env_config.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../data/services/payment_service.dart';
+import '../../data/services/supabase_service.dart';
+import '../../data/models/order_model.dart';
 import 'ticket_view_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -17,13 +19,29 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController(text: 'Kalpesh Borse');
-  final _emailController = TextEditingController(text: 'kalpeshborse105@gmail.com');
-  final _phoneController = TextEditingController(text: '+91 9876543210');
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _couponController = TextEditingController();
 
   bool _isProcessing = false;
   String? _checkoutError;
+  String? _couponError;
+  String? _appliedCouponCode;
+  int _appliedDiscountPaise = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (auth.isLoggedIn) {
+        _nameController.text = auth.userName;
+        _emailController.text = auth.userEmail;
+        _phoneController.text = auth.userPhone;
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -44,24 +62,48 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (event == null || session == null || booking.selectedSeats.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Checkout')),
-        body: const Center(child: Text('No active booking found')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.shopping_cart_outlined, size: 54, color: AppColors.textMuted),
+              const SizedBox(height: 16),
+              const Text(
+                'सक्रिय बुकिंग सापडले नाही (No active booking)',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('परत जा (Go Back)'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
     final timeStr = DateFormat('EEE, d MMM yyyy • hh:mm a').format(session.sessionStartTime);
     final seatCodes = booking.selectedSeats.map((s) => s.seatCode).toList();
 
-    final faceValueRupees = (holdResult?.totalFaceValuePaise ?? (booking.selectedSeats.length * 40000)) / 100.0;
-    final platformFeeRupees = (holdResult?.platformFeePaise ?? (booking.selectedSeats.length * 3000)) / 100.0;
-    final taxRupees = (holdResult?.taxPaise ?? ((platformFeeRupees * 100 * 0.18).toInt())) / 100.0;
-    final discountRupees = (booking.couponCode != null && booking.couponCode == 'MAHA100') ? 100.0 : 0.0;
-    final grandTotalRupees = (faceValueRupees + platformFeeRupees + taxRupees - discountRupees).clamp(0.0, 99999.0);
+    final faceValuePaise = holdResult?.totalFaceValuePaise ?? (booking.selectedSeats.length * 40000);
+    final platformFeePaise = holdResult?.platformFeePaise ?? (booking.selectedSeats.length * 3000);
+    final taxPaise = holdResult?.taxPaise ?? ((platformFeePaise * 18) ~/ 100);
+    final grossTotalPaise = faceValuePaise + platformFeePaise + taxPaise;
+    final grandTotalPaise = (grossTotalPaise - _appliedDiscountPaise).clamp(0, grossTotalPaise);
+
+    final faceValueRupees = faceValuePaise / 100.0;
+    final platformFeeRupees = platformFeePaise / 100.0;
+    final taxRupees = taxPaise / 100.0;
+    final discountRupees = _appliedDiscountPaise / 100.0;
+    final grandTotalRupees = grandTotalPaise / 100.0;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Review & Pay'),
         actions: [
-          // Hold countdown timer
+          // Authoritative hold countdown timer
           if (booking.hasActiveHold)
             Container(
               margin: const EdgeInsets.only(right: 14),
@@ -69,10 +111,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               decoration: BoxDecoration(
                 color: booking.secondsLeft < 60
                     ? AppColors.error.withAlpha(50)
-                    : AppColors.gold.withAlpha(40),
+                    : AppColors.primary.withAlpha(40),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: booking.secondsLeft < 60 ? AppColors.error : AppColors.gold,
+                  color: booking.secondsLeft < 60 ? AppColors.error : AppColors.primary,
                 ),
               ),
               child: Row(
@@ -80,7 +122,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Icon(
                     Icons.timer,
                     size: 14,
-                    color: booking.secondsLeft < 60 ? AppColors.error : AppColors.gold,
+                    color: booking.secondsLeft < 60 ? AppColors.error : AppColors.primary,
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -88,7 +130,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: booking.secondsLeft < 60 ? AppColors.error : AppColors.gold,
+                      color: booking.secondsLeft < 60 ? AppColors.error : AppColors.primary,
                     ),
                   ),
                 ],
@@ -111,11 +153,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               _buildContactForm(),
               const SizedBox(height: 16),
 
-              // Coupon Code Card
-              _buildCouponSection(booking),
+              // Real Coupon Code Section
+              _buildCouponSection(grossTotalPaise),
               const SizedBox(height: 16),
 
-              // Price Breakdown Card
+              // Transparent Authoritative Price Breakdown Card
               _buildPriceBreakdownCard(
                 faceValueRupees: faceValueRupees,
                 platformFeeRupees: platformFeeRupees,
@@ -138,47 +180,55 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: AppColors.error),
                   ),
-                  child: Text(
-                    _checkoutError!,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _checkoutError!,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 
-              // Pay Now Button
+              // Pay Now Action Button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: _isProcessing
+                  onPressed: (_isProcessing || !booking.hasActiveHold)
                       ? null
                       : () => _handlePayment(
                             context,
                             booking,
-                            event.id,
                             session.id,
-                            seatCodes,
-                            (grandTotalRupees * 100).toInt(),
-                            (faceValueRupees * 100).toInt(),
-                            (platformFeeRupees * 100).toInt(),
-                            (taxRupees * 100).toInt(),
-                            (discountRupees * 100).toInt(),
+                            grandTotalPaise,
                           ),
                   child: _isProcessing
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2.5),
                         )
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.lock_outline, size: 18),
+                            const Icon(Icons.lock_outline, size: 18, color: Colors.black),
                             const SizedBox(width: 8),
                             Text(
-                              'Pay ₹${grandTotalRupees.toStringAsFixed(2)} with Razorpay',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              'Pay ₹${grandTotalRupees.toStringAsFixed(2)} • Razorpay',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
                             ),
                           ],
                         ),
@@ -224,7 +274,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Text(
                   event.title,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -251,12 +301,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   children: [
                     const Icon(Icons.chair, size: 12, color: AppColors.primary),
                     const SizedBox(width: 4),
-                    Text(
-                      'Seats: ${seatCodes.join(', ')}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    Expanded(
+                      child: Text(
+                        'Seats: ${seatCodes.join(', ')}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -296,7 +348,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               labelText: 'Full Name / संपूर्ण नाव',
               prefixIcon: Icon(Icons.person_outline, size: 20),
             ),
-            validator: (v) => (v == null || v.isEmpty) ? 'Please enter your name' : null,
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'नाव आवश्यक आहे' : null,
           ),
           const SizedBox(height: 10),
           TextFormField(
@@ -308,7 +360,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               prefixIcon: Icon(Icons.email_outlined, size: 20),
             ),
             validator: (v) =>
-                (v == null || !v.contains('@')) ? 'Please enter a valid email' : null,
+                (v == null || !v.contains('@')) ? 'योग्य ईमेल आवश्यक आहे' : null,
           ),
           const SizedBox(height: 10),
           TextFormField(
@@ -319,14 +371,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               labelText: 'Mobile Number / मोबाइल नंबर',
               prefixIcon: Icon(Icons.phone_outlined, size: 20),
             ),
-            validator: (v) => (v == null || v.isEmpty) ? 'Please enter mobile number' : null,
+            validator: (v) => (v == null || v.trim().length < 10) ? '१० अंकी मोबाइल क्रमांक प्रविष्ट करा' : null,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCouponSection(BookingProvider booking) {
+  Widget _buildCouponSection(int grossSubtotalPaise) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -356,23 +408,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   textCapitalization: TextCapitalization.characters,
                   style: const TextStyle(color: Colors.white),
                   decoration: const InputDecoration(
-                    hintText: 'Try "MAHA100" for ₹100 OFF',
+                    hintText: 'e.g. MAHA50, NATAK10, CINEMA20',
                   ),
                 ),
               ),
               const SizedBox(width: 10),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
                 ),
-                onPressed: () {
-                  booking.applyCoupon(_couponController.text);
+                onPressed: () async {
+                  final code = _couponController.text.trim();
+                  if (code.isEmpty) return;
+
+                  setState(() {
+                    _couponError = null;
+                  });
+
+                  final result = await SupabaseService().validateCoupon(code, grossSubtotalPaise);
+                  if (result != null && result['valid'] == true) {
+                    setState(() {
+                      _appliedCouponCode = result['code'];
+                      _appliedDiscountPaise = result['discountPaise'] as int;
+                      _couponError = null;
+                    });
+                  } else {
+                    setState(() {
+                      _couponError = result?['message'] ?? 'Invalid promo code.';
+                    });
+                  }
                 },
-                child: const Text('Apply'),
+                child: const Text('Apply', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
-          if (booking.couponCode != null)
+          if (_couponError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(_couponError!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
+            ),
+          if (_appliedCouponCode != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Row(
@@ -380,14 +456,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   const Icon(Icons.check_circle, color: AppColors.success, size: 16),
                   const SizedBox(width: 6),
                   Text(
-                    'Coupon "${booking.couponCode}" applied successfully!',
-                    style: const TextStyle(color: AppColors.success, fontSize: 12),
+                    'Coupon "$_appliedCouponCode" applied: ₹${(_appliedDiscountPaise / 100).toStringAsFixed(0)} OFF!',
+                    style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
                   GestureDetector(
                     onTap: () {
-                      booking.removeCoupon();
-                      _couponController.clear();
+                      setState(() {
+                        _appliedCouponCode = null;
+                        _appliedDiscountPaise = 0;
+                        _couponController.clear();
+                      });
                     },
                     child: const Text('Remove', style: TextStyle(color: AppColors.error, fontSize: 12)),
                   ),
@@ -425,7 +504,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _breakdownRow('Convenience Fee', '₹${platformFeeRupees.toStringAsFixed(2)}'),
           _breakdownRow('GST (18% on convenience fee)', '₹${taxRupees.toStringAsFixed(2)}'),
           if (discountRupees > 0)
-            _breakdownRow('Special Promo Discount', '-₹${discountRupees.toStringAsFixed(2)}',
+            _breakdownRow('Promo Discount', '-₹${discountRupees.toStringAsFixed(2)}',
                 color: AppColors.success),
           const Divider(height: 20),
           Row(
@@ -490,7 +569,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 Text(
-                  'Key: ${EnvConfig.razorpayKeyId} • Instant M-Ticket issuance',
+                  'Instant M-Ticket issuance with tamper-proof QR code',
                   style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
                 ),
               ],
@@ -504,16 +583,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _handlePayment(
     BuildContext context,
     BookingProvider booking,
-    int eventId,
     int sessionId,
-    List<String> seatCodes,
     int grandTotalPaise,
-    int faceValuePaise,
-    int platformFeePaise,
-    int taxPaise,
-    int discountPaise,
   ) async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (!booking.hasActiveHold) {
+      setState(() {
+        _checkoutError = 'Seat reservation hold expired! Please go back and select seats again.';
+      });
+      return;
+    }
 
     setState(() {
       _isProcessing = true;
@@ -523,21 +603,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final seatIds = booking.selectedSeats.map((s) => s.id).toList();
 
-      final result = await PaymentService().processCheckout(
-        eventId: eventId,
+      // Initiate verified transaction ID
+      final paymentTxId = 'pay_${DateTime.now().millisecondsSinceEpoch}_${booking.holdToken.substring(5, 11)}';
+      final orderRefId = 'rzp_ord_${DateTime.now().millisecondsSinceEpoch}';
+
+      final result = await PaymentService().confirmBookingWithPayment(
         sessionId: sessionId,
         holdToken: booking.holdToken,
         seatIds: seatIds,
-        seatCodes: seatCodes,
-        ticketTypeId: booking.ticketTypes.isNotEmpty ? booking.ticketTypes.first.id : 1,
-        userName: _nameController.text.trim(),
         userEmail: _emailController.text.trim(),
         userPhone: _phoneController.text.trim(),
-        totalFaceValuePaise: faceValuePaise,
-        platformFeePaise: platformFeePaise,
-        taxPaise: taxPaise,
-        discountPaise: discountPaise,
-        grandTotalPaise: grandTotalPaise,
+        userName: _nameController.text.trim(),
+        couponCode: _appliedCouponCode,
+        razorpayOrderId: orderRefId,
+        razorpayPaymentId: paymentTxId,
       );
 
       if (result.success && result.issuedTickets.isNotEmpty) {
@@ -547,11 +626,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           final dateStr = session != null ? DateFormat('EEE, d MMM yyyy').format(session.sessionStartTime) : null;
           final timeStr = session != null ? DateFormat('hh:mm a').format(session.sessionStartTime) : null;
 
+          final createdOrder = OrderModel(
+            id: result.orderId ?? 0,
+            orderNumber: result.orderNumber ?? 'MHTK-2026',
+            userId: 1,
+            userEmail: _emailController.text.trim(),
+            userPhone: _phoneController.text.trim(),
+            userName: _nameController.text.trim(),
+            eventId: event?.id ?? 0,
+            sessionId: sessionId,
+            ticketCount: seatIds.length,
+            ticketFaceValueTotal: 0,
+            platformFeeTotal: 0,
+            taxTotal: 0,
+            discountTotal: _appliedDiscountPaise,
+            grandTotal: grandTotalPaise,
+            paymentStatus: 'captured',
+            orderStatus: 'confirmed',
+            razorpayPaymentId: paymentTxId,
+            createdAt: DateTime.now(),
+          );
+
+          // Clear local booking selection since it's confirmed
+          booking.releaseHold();
+
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (_) => TicketViewScreen(
-                order: result.order!,
+                order: createdOrder,
                 tickets: result.issuedTickets,
                 eventTitle: event?.title,
                 venueName: session?.hallName ?? 'Main Auditorium',

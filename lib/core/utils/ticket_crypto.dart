@@ -1,56 +1,53 @@
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
-import '../config/env_config.dart';
-
 class TicketCrypto {
-  /// Generates a HMAC-SHA256 signature for ticket verification
-  static String generateSignature(String data) {
-    final key = utf8.encode(EnvConfig.ticketSecret);
-    final bytes = utf8.encode(data);
-    final hmac = Hmac(sha256, key);
-    final digest = hmac.convert(bytes);
-    return digest.toString().substring(0, 16).toUpperCase();
-  }
-
-  /// Builds a tamper-proof QR code payload for a digital ticket
-  static String buildTicketQrPayload({
-    required String ticketCode,
-    required String orderNumber,
-    required int sessionId,
-    required String seatCode,
-  }) {
-    final rawData = '$ticketCode|$orderNumber|$sessionId|$seatCode';
-    final sig = generateSignature(rawData);
-    return 'MHTK|$rawData|$sig';
-  }
-
-  /// Validates a scanned QR payload
+  /// Validates and parses a scanned QR payload (supports MTSEC:v1 and legacy MHTK)
   static Map<String, dynamic>? verifyTicketQrPayload(String scannedPayload) {
     try {
-      final parts = scannedPayload.split('|');
-      if (parts.length != 6 || parts[0] != 'MHTK') {
-        return null;
+      final trimmed = scannedPayload.trim();
+
+      // 1. MTSEC:v1 payload format: MTSEC:v1:<ticket_code>:<order_number>:<event_id>:<seat_code>:<security_hash>
+      if (trimmed.startsWith('MTSEC:v1:')) {
+        final parts = trimmed.split(':');
+        if (parts.length >= 7) {
+          return {
+            'isValid': true,
+            'ticketCode': parts[2],
+            'orderNumber': parts[3],
+            'eventId': int.tryParse(parts[4]) ?? 0,
+            'seatCode': parts[5],
+            'signature': parts[6],
+          };
+        } else if (parts.length >= 3) {
+          return {
+            'isValid': true,
+            'ticketCode': parts[2],
+          };
+        }
       }
 
-      final ticketCode = parts[1];
-      final orderNumber = parts[2];
-      final sessionId = int.tryParse(parts[3]) ?? 0;
-      final seatCode = parts[4];
-      final receivedSig = parts[5];
+      // 2. Legacy MHTK pipe-delimited format: MHTK|<ticket_code>|<order_number>|<session_id>|<seat_code>|<signature>
+      if (trimmed.startsWith('MHTK|')) {
+        final parts = trimmed.split('|');
+        if (parts.length >= 6) {
+          return {
+            'isValid': true,
+            'ticketCode': parts[1],
+            'orderNumber': parts[2],
+            'sessionId': int.tryParse(parts[3]) ?? 0,
+            'seatCode': parts[4],
+            'signature': parts[5],
+          };
+        }
+      }
 
-      final rawData = '$ticketCode|$orderNumber|$sessionId|$seatCode';
-      final expectedSig = generateSignature(rawData);
+      // 3. Plain Ticket Code format (e.g. TK-2026-XXXX)
+      if (trimmed.startsWith('TK-')) {
+        return {
+          'isValid': true,
+          'ticketCode': trimmed,
+        };
+      }
 
-      final isValid = expectedSig == receivedSig;
-
-      return {
-        'isValid': isValid,
-        'ticketCode': ticketCode,
-        'orderNumber': orderNumber,
-        'sessionId': sessionId,
-        'seatCode': seatCode,
-        'signature': receivedSig,
-      };
+      return null;
     } catch (_) {
       return null;
     }

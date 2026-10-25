@@ -168,3 +168,51 @@ class TicketTypeModel {
         'is_seated': isSeated,
       };
 }
+
+class VenueSectionModel {
+  final int id;
+  final int venueId;
+  final String name;
+  final String nameMr;
+  final int rowsCount;
+  final int colsCount;
+  final int basePrice;
+  final int accessible;
+
+  VenueSectionModel({
+    required this.id,
+    required this.venueId,
+    required this.name,
+    required this.nameMr,
+    this.rowsCount = 0,
+    this.colsCount = 0,
+    this.basePrice = 0,
+    this.accessible = 0,
+  });
+
+  double get basePriceRupees => basePrice / 100.0;
+
+  factory VenueSectionModel.fromJson(Map<String, dynamic> json) {
+    return VenueSectionModel(
+      id: json['id'] is int ? json['id'] : int.tryParse('${json['id']}') ?? 0,
+      venueId: json['venue_id'] ?? 0,
+      name: json['name'] ?? '',
+      nameMr: json['name_mr'] ?? json['name'] ?? '',
+      rowsCount: json['rows_count'] ?? 0,
+      colsCount: json['cols_count'] ?? 0,
+      basePrice: json['base_price'] ?? 0,
+      accessible: json['accessible'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'venue_id': venueId,
+        'name': name,
+        'name_mr': nameMr,
+        'rows_count': rowsCount,
+        'cols_count': colsCount,
+        'base_price': basePrice,
+        'accessible': accessible,
+      };
+}

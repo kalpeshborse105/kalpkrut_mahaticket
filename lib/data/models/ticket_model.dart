@@ -30,6 +30,9 @@ class TicketModel {
   });
 
   double get faceValueRupees => faceValue / 100.0;
+  bool get isValid => status == 'valid';
+  bool get isUsed => status == 'used';
+  bool get isCancelled => status == 'cancelled';
 
   factory TicketModel.fromJson(Map<String, dynamic> json) {
     return TicketModel(

@@ -18,6 +18,7 @@ class BookingProvider with ChangeNotifier {
   List<SessionModel> _sessions = [];
   List<TicketTypeModel> _ticketTypes = [];
   List<SeatModel> _venueSeats = [];
+  List<VenueSectionModel> _venueSections = [];
   List<SeatInventoryModel> _inventory = [];
 
   final List<SeatModel> _selectedSeats = [];
@@ -38,6 +39,7 @@ class BookingProvider with ChangeNotifier {
   List<SessionModel> get sessions => _sessions;
   List<TicketTypeModel> get ticketTypes => _ticketTypes;
   List<SeatModel> get venueSeats => _venueSeats;
+  List<VenueSectionModel> get venueSections => _venueSections;
   List<SeatInventoryModel> get inventory => _inventory;
   List<SeatModel> get selectedSeats => _selectedSeats;
   String get holdToken => _holdToken;
@@ -93,6 +95,7 @@ class BookingProvider with ChangeNotifier {
     _ticketTypes = await _supabaseService.getTicketTypes(session.id);
     if (_selectedEvent != null) {
       _venueSeats = await _supabaseService.getVenueSeats(_selectedEvent!.venueId);
+      _venueSections = await _supabaseService.getVenueSections(_selectedEvent!.venueId);
     }
 
     // 2. Fetch initial seat inventory

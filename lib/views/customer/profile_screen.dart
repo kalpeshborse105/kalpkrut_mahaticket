@@ -9,6 +9,7 @@ import 'my_tickets_screen.dart';
 import 'post_event_screen.dart';
 import 'help_support_screen.dart';
 import 'policy_viewer_screen.dart';
+import 'auth_bottom_sheet.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -20,190 +21,25 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String _selectedLanguage = 'मराठी (Marathi)';
 
-  String _roleToString(UserRole role) {
-    switch (role) {
-      case UserRole.superAdmin:
-        return 'super_admin';
-      case UserRole.organizer:
-        return 'organizer';
-      default:
-        return 'customer';
-    }
-  }
-
-  UserRole _stringToRole(String role) {
-    switch (role) {
-      case 'super_admin':
-        return UserRole.superAdmin;
-      case 'organizer':
-        return UserRole.organizer;
-      default:
-        return UserRole.customer;
-    }
-  }
-
-  void _showRoleSwitcherDialog() {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    final pinController = TextEditingController();
-    String tempRole = _roleToString(auth.role);
-    String? errorMessage;
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            return AlertDialog(
-              backgroundColor: AppColors.surface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Row(
-                children: [
-                  Icon(Icons.shield_outlined, color: AppColors.primary),
-                  SizedBox(width: 8),
-                  Text('भूमिका बदला (Switch Role)', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white)),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Select account operating mode:', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () => setDialogState(() {
-                      tempRole = 'customer';
-                      errorMessage = null;
-                    }),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          Icon(
-                            tempRole == 'customer' ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                            color: AppColors.primary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          const Text('प्रेक्षक / ग्राहक (Customer / Audience)', style: TextStyle(fontSize: 14)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => setDialogState(() {
-                      tempRole = 'organizer';
-                      errorMessage = null;
-                    }),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          Icon(
-                            tempRole == 'organizer' ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                            color: AppColors.gold,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          const Text('नाट्य निर्माते व आयोजक (Organizer)', style: TextStyle(fontSize: 14)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => setDialogState(() {
-                      tempRole = 'super_admin';
-                      errorMessage = null;
-                    }),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          Icon(
-                            tempRole == 'super_admin' ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                            color: AppColors.neonGreen,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          const Text('सुपर अ‍ॅडमिन (Super Admin)', style: TextStyle(fontSize: 14)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (tempRole == 'super_admin') ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: pinController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'Admin PIN Passcode',
-                        hintText: 'Enter Admin PIN (Admin2026)',
-                        errorText: errorMessage,
-                        filled: true,
-                        fillColor: AppColors.surfaceLight,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogCtx),
-                  child: const Text('रद्द करा (Cancel)', style: TextStyle(color: AppColors.textSecondary)),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                  onPressed: () async {
-                    if (tempRole == 'super_admin') {
-                      if (pinController.text.trim() != 'Admin2026') {
-                        setDialogState(() {
-                          errorMessage = 'चुकीचा पिन! (Invalid PIN - use Admin2026)';
-                        });
-                        return;
-                      }
-                    }
-
-                    final success = await auth.switchRole(
-                      _stringToRole(tempRole),
-                      adminPin: pinController.text.trim(),
-                    );
-                    if (dialogCtx.mounted) {
-                      Navigator.pop(dialogCtx);
-                    }
-                    if (!mounted) return;
-                    if (success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('भूमिका बदलली: ${_getRoleLabel(tempRole)}')),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('भूमिका बदलता आली नाही (Failed to switch role)')),
-                      );
-                    }
-                  },
-                  child: const Text('लागू करा (Apply)'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
   void _showLanguageDialog() {
     showDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: AppColors.surface,
-          title: const Text('भाषा निवडा (Select Language)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          title: const Text(
+            'भाषा निवडा (Select Language)',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
                 title: const Text('मराठी (Marathi)'),
                 leading: Icon(
-                  _selectedLanguage.startsWith('मराठी') ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  _selectedLanguage.startsWith('मराठी')
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
                   color: AppColors.primary,
                 ),
                 onTap: () {
@@ -214,7 +50,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ListTile(
                 title: const Text('English'),
                 leading: Icon(
-                  _selectedLanguage.startsWith('English') ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  _selectedLanguage.startsWith('English')
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
                   color: AppColors.primary,
                 ),
                 onTap: () {
@@ -229,22 +67,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  String _getRoleLabel(String role) {
+  String _getRoleLabel(UserRole role) {
     switch (role) {
-      case 'super_admin':
+      case UserRole.superAdmin:
         return 'सुपर अ‍ॅडमिन (Super Admin)';
-      case 'organizer':
+      case UserRole.organizer:
         return 'नाट्य निर्माते (Organizer)';
       default:
         return 'प्रेक्षक (Audience)';
     }
   }
 
-  Color _getRoleColor(String role) {
+  Color _getRoleColor(UserRole role) {
     switch (role) {
-      case 'super_admin':
+      case UserRole.superAdmin:
         return AppColors.neonGreen;
-      case 'organizer':
+      case UserRole.organizer:
         return AppColors.gold;
       default:
         return AppColors.primary;
@@ -254,7 +92,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
-    final currentRoleStr = _roleToString(auth.role);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -262,8 +99,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('माझे प्रोफाईल (Profile Hub)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            Text('Account, Roles & Preferences', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            Text('माझे प्रोफाईल (Profile Hub)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text('Account, Roles & Preferences',
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
           ],
         ),
       ),
@@ -271,97 +110,213 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // User Card
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.surface, AppColors.surfaceLight],
+            // User Card or Guest Sign-In Banner
+            if (!auth.isLoggedIn)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withAlpha(40),
+                      AppColors.surface,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.primary.withAlpha(80)),
                 ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: _getRoleColor(currentRoleStr).withAlpha(40),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: _getRoleColor(currentRoleStr), width: 2),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 54,
+                          height: 54,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withAlpha(30),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.primary, width: 1.5),
+                          ),
+                          child: const Icon(Icons.person_outline, color: AppColors.primary, size: 28),
                         ),
-                        child: Center(
-                          child: Text(
-                            auth.userName.isNotEmpty ? auth.userName[0].toUpperCase() : 'U',
-                            style: TextStyle(
-                              color: _getRoleColor(currentRoleStr),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 22,
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'महातिकिट मध्ये स्वागत आहे!',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'तिकिटे बुक करण्यासाठी व सेव्ह करण्यासाठी लॉग इन करा.',
+                                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.login, color: Colors.black, size: 18),
+                        label: const Text(
+                          'प्रवेश करा / नोंदणी करा (Sign In / Sign Up)',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        onPressed: () => AuthBottomSheet.show(context),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.surface, AppColors.surfaceLight],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: _getRoleColor(auth.role).withAlpha(40),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: _getRoleColor(auth.role), width: 2),
+                          ),
+                          child: Center(
+                            child: Text(
+                              auth.userName.isNotEmpty ? auth.userName[0].toUpperCase() : 'U',
+                              style: TextStyle(
+                                color: _getRoleColor(auth.role),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 22,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                auth.userName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 17,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              if (auth.userPhone.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  auth.userPhone,
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 2),
+                              Text(
+                                auth.userEmail,
+                                style: const TextStyle(
+                                  color: AppColors.textMuted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(color: Colors.white12),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
                           children: [
+                            const Icon(Icons.verified_user, size: 16, color: AppColors.textSecondary),
+                            const SizedBox(width: 6),
                             Text(
-                              auth.userName,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              auth.userPhone,
-                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              auth.userEmail,
-                              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                              _getRoleLabel(auth.role),
+                              style: TextStyle(
+                                color: _getRoleColor(auth.role),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(color: Colors.white12),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.verified_user, size: 16, color: AppColors.textSecondary),
-                          const SizedBox(width: 6),
-                          Text(
-                            _getRoleLabel(currentRoleStr),
-                            style: TextStyle(
-                              color: _getRoleColor(currentRoleStr),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           ),
-                        ],
-                      ),
-                      TextButton.icon(
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          icon: const Icon(Icons.logout, size: 16),
+                          label: const Text(
+                            'बाहेर पडा (Sign Out)',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                          onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: AppColors.surface,
+                                title: const Text('बाहेर पडायचे आहे का? (Sign Out)'),
+                                content: const Text('Are you sure you want to sign out of MahaTicket?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('रद्द करा (Cancel)'),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: const Text('Sign Out'),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (confirm == true) {
+                              await auth.signOut();
+                            }
+                          },
                         ),
-                        icon: const Icon(Icons.sync_alt, size: 16),
-                        label: const Text('Switch Role', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        onPressed: _showRoleSwitcherDialog,
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
 
             const SizedBox(height: 24),
 
@@ -373,7 +328,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               subtitle: 'View upcoming & past show tickets',
               color: AppColors.primary,
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const MyTicketsScreen()));
+                if (!auth.isLoggedIn) {
+                  AuthBottomSheet.show(context);
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
+                  );
+                }
               },
             ),
 
@@ -385,19 +347,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
               subtitle: 'List your drama play or event on MahaTicket',
               color: AppColors.gold,
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const PostEventScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PostEventScreen()),
+                );
               },
             ),
-            const SizedBox(height: 8),
-            _buildMenuItem(
-              icon: Icons.business_center,
-              title: 'निर्माते कन्सोल (Organizer Console)',
-              subtitle: 'View ticket sales GMV, commission & settlements',
-              color: Colors.orangeAccent,
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const OrganizerConsoleScreen()));
-              },
-            ),
+
+            if (auth.isOrganizer || auth.isSuperAdmin) ...[
+              const SizedBox(height: 8),
+              _buildMenuItem(
+                icon: Icons.business_center,
+                title: 'निर्माते कन्सोल (Organizer Console)',
+                subtitle: 'View ticket sales GMV, commission & settlements',
+                color: Colors.orangeAccent,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const OrganizerConsoleScreen()),
+                  );
+                },
+              ),
+            ],
 
             if (auth.isSuperAdmin) ...[
               const SizedBox(height: 16),
@@ -409,7 +380,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: AppColors.neonGreen,
                 badge: 'ADMIN ACCESS',
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+                  );
                 },
               ),
               const SizedBox(height: 8),
@@ -419,7 +393,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 subtitle: 'Real-time ticket validation & entry check',
                 color: AppColors.cyan,
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const QrGateScannerScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const QrGateScannerScreen()),
+                  );
                 },
               ),
             ],
@@ -440,7 +417,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               subtitle: 'WhatsApp concierge, phone desk & FAQs',
               color: AppColors.primary,
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                );
               },
             ),
             const SizedBox(height: 8),
@@ -450,7 +430,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               subtitle: 'Terms of Service, Privacy & Cancellation rules',
               color: AppColors.textSecondary,
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const PolicyViewerScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PolicyViewerScreen()),
+                );
               },
             ),
 
@@ -460,21 +443,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Column(
               children: [
                 const Text(
-                  'महाटिकिट (MahaTicket) v1.0.21',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textSecondary),
+                  'महाटिकिट (MahaTicket) v1.0.22',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 const Text(
-                  'Build 22 • com.kalpkrutinfotech.mahaticket',
+                  'Build 23 • com.kalpkrutinfotech.mahaticket',
                   style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                 ),
                 const SizedBox(height: 6),
-                Row(
+                const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Crafted with ', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                    const Icon(Icons.favorite, color: AppColors.primary, size: 14),
-                    const Text(' for Maharashtra Theatre Culture', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    Text('Crafted with ',
+                        style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    Icon(Icons.favorite, color: AppColors.primary, size: 14),
+                    Text(' for Maharashtra Theatre Culture',
+                        style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
                   ],
                 ),
               ],
@@ -493,7 +482,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.only(left: 4, bottom: 8),
         child: Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textMuted),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: AppColors.textMuted,
+          ),
         ),
       ),
     );
@@ -540,7 +533,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Flexible(
                           child: Text(
                             title,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.white,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -554,7 +551,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             child: Text(
                               badge,
-                              style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],

@@ -43,8 +43,13 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
     try {
       String ticketCode = input;
 
-      // Check if it's a signed QR payload
-      if (input.startsWith('MHTK|')) {
+      // Check if it's a signed MTSEC QR payload (TicketGhar / MahaTicket standard)
+      if (input.startsWith('MTSEC:v1:')) {
+        final parts = input.split(':');
+        if (parts.length >= 3) {
+          ticketCode = parts[2];
+        }
+      } else if (input.startsWith('MHTK|')) {
         final verified = TicketCrypto.verifyTicketQrPayload(input);
         if (verified == null || verified['isValid'] != true) {
           setState(() {

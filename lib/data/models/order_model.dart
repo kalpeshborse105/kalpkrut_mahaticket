@@ -45,6 +45,8 @@ class OrderModel {
   double get faceValueRupees => ticketFaceValueTotal / 100.0;
   double get platformFeeRupees => platformFeeTotal / 100.0;
   double get taxRupees => taxTotal / 100.0;
+  bool get isConfirmed => orderStatus == 'confirmed';
+
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     return OrderModel(
