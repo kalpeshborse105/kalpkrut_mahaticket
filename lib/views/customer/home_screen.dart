@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/events_provider.dart';
 import '../../data/models/event_model.dart';
+import 'widgets/event_card.dart';
 import 'event_detail_screen.dart';
 import 'my_tickets_screen.dart';
 import 'post_event_screen.dart';
@@ -578,11 +579,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: AppColors.gold,
                                       ),
                                     ),
+                                    if (event.venueDisplayName.isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${event.venueDisplayName} • ${event.venueCity}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.textMuted,
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: AppColors.primary,
                                   borderRadius: BorderRadius.circular(10),
@@ -593,13 +607,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ],
                                 ),
-                                child: const Text(
-                                  'Book Now',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      'Book Now',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
+                                    ),
+                                    if (event.minPriceRupees != null)
+                                      Text(
+                                        'From ₹${event.minPriceRupees!.toInt()}',
+                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 9.5, color: Colors.white70),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
+
                         ),
                       ],
                     ),
@@ -698,141 +723,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEventCard(BuildContext context, EventModel event) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => EventDetailScreen(event: event),
-          ),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.surfaceBorder),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Poster image
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: CachedNetworkImage(
-                      imageUrl: event.posterUrl,
-                      fit: BoxFit.cover,
-                      errorWidget: (context, url, error) => Container(color: AppColors.surfaceLight),
-                    ),
-                  ),
-                  if (event.tag != null)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          event.tag!,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    bottom: 6,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withAlpha(180),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.star, color: AppColors.gold, size: 12),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${event.rating}/10',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Details
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    event.titleMr,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.gold,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        event.language,
-                        style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text(
-                          event.ageGuidance,
-                          style: const TextStyle(fontSize: 9, color: AppColors.textSecondary),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return EventCard(event: event);
   }
+
 
   void _showCityPicker(BuildContext context, EventsProvider prov) {
     showModalBottomSheet(

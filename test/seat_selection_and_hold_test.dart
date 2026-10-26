@@ -11,9 +11,10 @@ void main() {
     try {
       await Supabase.initialize(
         url: 'https://hnseawulngdxbvltmthe.supabase.co',
-        anonKey:
+        publishableKey:
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhuc2Vhd3VsbmdkeGJ2bHRtdGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3MDc5NjIsImV4cCI6MjEwNjI4Mzk2Mn0.Jk1k0ZPMpldURgv37Hq1OfTjSY45GBcZ21qT_74SK9o',
       );
+
     } catch (_) {}
   });
 

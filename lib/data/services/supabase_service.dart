@@ -43,8 +43,8 @@ class SupabaseService {
     try {
       final bool hasCity = city != null && city.isNotEmpty && city.toLowerCase() != 'all';
       PostgrestFilterBuilder query = hasCity
-          ? client.from('events').select('*, venues!inner(city)')
-          : client.from('events').select('*, venues(city)');
+          ? client.from('events').select('*, venues!inner(*)')
+          : client.from('events').select('*, venues(*)');
 
       // Respect published lifecycle status
       query = query.eq('status', 'published');
@@ -60,7 +60,32 @@ class SupabaseService {
       final response = await query
           .order('featured', ascending: false)
           .order('id', ascending: false);
-      return (response as List).map((e) => EventModel.fromJson(e)).toList();
+
+      // Pre-load minimum prices from ticket_types for real, data-driven pricing
+      final Map<int, int> minPriceMap = {};
+      try {
+        final ticketTypesRes = await client.from('ticket_types').select('event_id, price');
+        for (final row in (ticketTypesRes as List)) {
+          final int eId = row['event_id'] is int ? row['event_id'] : int.tryParse('${row['event_id']}') ?? 0;
+          final int p = row['price'] is int ? row['price'] : int.tryParse('${row['price']}') ?? 0;
+          if (eId > 0 && p > 0) {
+            if (!minPriceMap.containsKey(eId) || p < minPriceMap[eId]!) {
+              minPriceMap[eId] = p;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Note: ticket_types min price fetch: $e');
+      }
+
+      return (response as List).map((e) {
+        final Map<String, dynamic> map = Map<String, dynamic>.from(e);
+        final int id = map['id'] is int ? map['id'] : int.tryParse('${map['id']}') ?? 0;
+        if (minPriceMap.containsKey(id)) {
+          map['min_price_paise'] = minPriceMap[id];
+        }
+        return EventModel.fromJson(map);
+      }).toList();
     } catch (e) {
       debugPrint('Error fetching events: $e');
       return [];
@@ -82,10 +107,10 @@ class SupabaseService {
     }
   }
 
-  /// Fetch event by ID
+  /// Fetch event by ID with venue
   Future<EventModel?> getEventById(int id) async {
     try {
-      final response = await client.from('events').select('*').eq('id', id).maybeSingle();
+      final response = await client.from('events').select('*, venues(*)').eq('id', id).maybeSingle();
       if (response == null) return null;
       return EventModel.fromJson(response);
     } catch (e) {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'venue_model.dart';
 
 class CastCrewMember {
   final String name;
@@ -57,6 +58,9 @@ class EventModel {
   final int convenienceFeeValue; // in paise
   final int gstPercent;
   final String status;
+  final VenueModel? venue;
+  final int? minPricePaise;
+  final String? cancellationPolicy;
 
   EventModel({
     required this.id,
@@ -81,7 +85,11 @@ class EventModel {
     this.convenienceFeeValue = 3000,
     this.gstPercent = 18,
     this.status = 'published',
+    this.venue,
+    this.minPricePaise,
+    this.cancellationPolicy,
   });
+
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
     List<CastCrewMember> castList = [];
@@ -120,6 +128,13 @@ class EventModel {
       convenienceFeeValue: json['convenience_fee_value'] ?? 3000,
       gstPercent: json['gst_percent'] ?? 18,
       status: json['status'] ?? 'published',
+      venue: json['venues'] != null && json['venues'] is Map<String, dynamic>
+          ? VenueModel.fromJson(json['venues'])
+          : null,
+      minPricePaise: json['min_price_paise'] is int
+          ? json['min_price_paise']
+          : int.tryParse('${json['min_price_paise']}'),
+      cancellationPolicy: json['cancellation_policy'],
     );
   }
 
@@ -144,10 +159,17 @@ class EventModel {
         'tag': tag,
         'cast_crew': jsonEncode(castCrew.map((c) => c.toJson()).toList()),
         'status': status,
+        'min_price_paise': minPricePaise,
+        'cancellation_policy': cancellationPolicy,
       };
 
   // Convenience getters for modern BookMyShow style UI
   double get rating => (featured > 0 ? 9.4 : 8.8);
   int get votesCount => (featured > 0 ? 14200 : 5600);
   List<CastCrewMember> get cast => castCrew;
+  double? get minPriceRupees => minPricePaise != null ? minPricePaise! / 100.0 : null;
+  String get venueDisplayName =>
+      venue != null ? (venue!.nameMr.isNotEmpty ? venue!.nameMr : venue!.name) : '';
+  String get venueCity => venue?.city ?? 'Maharashtra';
 }
+

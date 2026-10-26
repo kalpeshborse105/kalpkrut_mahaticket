@@ -154,5 +154,63 @@ void main() {
       expect(ticket.isUsed, isFalse);
       expect(ticket.qrPayload.startsWith('MTSEC:v1:'), isTrue);
     });
+
+    test('VenueModel serialization and layout configuration', () {
+      final json = {
+        'id': 7,
+        'name': 'PVR INOX: R City Mall',
+        'name_mr': 'पीव्हीआर आयनॉक्स: आर सिटी मॉल',
+        'city': 'Mumbai',
+        'address': 'LBS Marg, Ghatkopar West',
+        'total_capacity': 600,
+        'has_seat_layout': 1,
+        'layout_config': '{"screenArc":true}',
+      };
+
+      final venue = VenueModel.fromJson(json);
+      expect(venue.id, 7);
+      expect(venue.name, 'PVR INOX: R City Mall');
+      expect(venue.city, 'Mumbai');
+      expect(venue.hasSeatLayout, isTrue);
+      expect(venue.totalCapacity, 600);
+    });
+
+    test('EventModel serialization, venue attachment and min price in Rupees', () {
+      final json = {
+        'id': 86,
+        'organizer_id': 1,
+        'venue_id': 7,
+        'title': 'Kantara: Chapter 1',
+        'title_mr': 'कांतारा: चॅप्टर १',
+        'slug': 'kantara-chapter-1',
+        'category': 'movies',
+        'category_mr': 'चित्रपट',
+        'language': 'Marathi',
+        'age_guidance': 'UA',
+        'duration_minutes': 165,
+        'description': 'Origin story',
+        'description_mr': 'दैवी लोकगाथा',
+        'poster_url': 'https://example.com/poster.jpg',
+        'featured': 1,
+        'min_price_paise': 18000,
+        'venues': {
+          'id': 7,
+          'name': 'PVR INOX: R City Mall',
+          'name_mr': 'पीव्हीआर आयनॉक्स',
+          'city': 'Mumbai',
+          'address': 'Ghatkopar West',
+        },
+      };
+
+      final event = EventModel.fromJson(json);
+      expect(event.id, 86);
+      expect(event.title, 'Kantara: Chapter 1');
+      expect(event.category, 'movies');
+      expect(event.minPriceRupees, 180.0);
+      expect(event.venue, isNotNull);
+      expect(event.venueDisplayName, 'पीव्हीआर आयनॉक्स');
+      expect(event.venueCity, 'Mumbai');
+    });
   });
 }
+
