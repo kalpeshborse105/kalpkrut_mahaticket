@@ -10,6 +10,7 @@ class TicketModel {
   final int faceValue; // paise
   final String securityHash;
   final String qrPayload;
+  final String? groupQrPayload;
   final String status; // 'valid' | 'used' | 'cancelled'
   final DateTime createdAt;
 
@@ -25,9 +26,18 @@ class TicketModel {
     required this.faceValue,
     required this.securityHash,
     required this.qrPayload,
+    this.groupQrPayload,
     this.status = 'valid',
     required this.createdAt,
   });
+
+  /// Prefer shared group QR (1 scan for up to 5 seats) when present.
+  String get displayQrPayload {
+    final group = groupQrPayload?.trim() ?? '';
+    if (group.startsWith('MTGRP:')) return group;
+    if (qrPayload.startsWith('MTGRP:')) return qrPayload;
+    return qrPayload;
+  }
 
   double get faceValueRupees => faceValue / 100.0;
   bool get isValid => status == 'valid';
@@ -51,6 +61,8 @@ class TicketModel {
       faceValue: asInt(json['face_value'] ?? json['faceValue']),
       securityHash: asStr(json['security_hash'], json['securityHash']),
       qrPayload: asStr(json['qr_payload'], json['qrPayload']),
+      groupQrPayload: json['group_qr_payload']?.toString() ??
+          json['groupQrPayload']?.toString(),
       status: asStr(json['status'], null, 'valid'),
       createdAt: DateTime.tryParse(
             asStr(json['created_at'], json['createdAt']),

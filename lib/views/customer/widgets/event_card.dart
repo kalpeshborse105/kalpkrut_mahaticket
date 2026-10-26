@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/event_model.dart';
+import '../../../providers/locale_provider.dart';
 import '../event_detail_screen.dart';
 
 class EventCard extends StatelessWidget {
@@ -18,10 +20,12 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String displayCategory = event.categoryMr.isNotEmpty ? event.categoryMr : event.category;
-    final String locationText = event.venueDisplayName.isNotEmpty
-        ? '${event.venueDisplayName} • ${event.venueCity}'
+    final marathi = context.watch<LocaleProvider>().isMarathi;
+    final String displayCategory = event.displayCategory(marathi: marathi);
+    final String locationText = event.displayVenue(marathi: marathi).isNotEmpty
+        ? '${event.displayVenue(marathi: marathi)} • ${event.venueCity}'
         : event.venueCity;
+    final String titleText = event.displayTitle(marathi: marathi);
 
     final String priceText = event.minPriceRupees != null
         ? '₹${event.minPriceRupees!.toInt()} पासून'
@@ -129,7 +133,7 @@ class EventCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Colors.black.withAlpha(190),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.white.withAlpha(30), width: 0.5),
+                          border: Border.all(color: Colors.white24, width: 0.5),
                         ),
                         child: Text(
                           displayCategory,
@@ -202,7 +206,7 @@ class EventCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Colors.black.withAlpha(220),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.white.withAlpha(40), width: 0.5),
+                          border: Border.all(color: Colors.white24, width: 0.5),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -235,7 +239,7 @@ class EventCard extends StatelessWidget {
                         child: Text(
                           event.ageGuidance,
                           style: const TextStyle(
-                            color: Colors.white70,
+                            color: AppColors.textSecondary,
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
                           ),
@@ -253,29 +257,16 @@ class EventCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Main Title
+                    // Single-language title (EN or MR from Profile toggle)
                     Text(
-                      event.title,
-                      maxLines: 1,
+                      titleText,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         letterSpacing: -0.2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-
-                    // Marathi Subtitle
-                    Text(
-                      event.titleMr.isNotEmpty ? event.titleMr : event.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.gold,
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 5),

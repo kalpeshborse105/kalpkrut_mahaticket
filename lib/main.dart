@@ -7,6 +7,7 @@ import 'providers/events_provider.dart';
 import 'providers/booking_provider.dart';
 import 'providers/admin_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/locale_provider.dart';
 import 'views/customer/home_screen.dart';
 
 void main() async {
@@ -28,16 +29,21 @@ class MahaTicketApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => EventsProvider()),
         ChangeNotifierProvider(create: (_) => BookingProvider()),
         ChangeNotifierProvider(create: (_) => AdminProvider()),
       ],
-      child: MaterialApp(
-        title: 'MahaTicket (महाटिकिट)',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme,
-        home: const HomeScreen(),
+      child: Consumer<LocaleProvider>(
+        builder: (context, locale, _) {
+          return MaterialApp(
+            title: locale.t('MahaTicket', 'महाटिकिट'),
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            home: const HomeScreen(),
+          );
+        },
       ),
     );
   }

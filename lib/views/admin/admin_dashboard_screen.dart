@@ -6,6 +6,7 @@ import 'admin_event_management_screen.dart';
 import 'admin_venues_screen.dart';
 import 'admin_orders_screen.dart';
 import 'admin_coupons_screen.dart';
+import 'admin_home_sections_screen.dart';
 import 'organizer_console_screen.dart';
 import 'qr_gate_scanner_screen.dart';
 import 'scraper_center_screen.dart';
@@ -135,6 +136,22 @@ class AdminDashboardScreen extends StatelessWidget {
               const Text(
                 'व्यवस्थापन व नियंत्रणे (Management Tools)',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 12),
+
+              // 0. Home Sections CMS (TicketGhar parity)
+              _buildToolCard(
+                title: 'होम स्क्रीन सेक्शन्स (Home Sections)',
+                subtitle: 'Hero, trending, categories titles, visibility & sort order for customer app',
+                icon: Icons.view_agenda_rounded,
+                color: AppColors.cyan,
+                badgeText: 'CMS',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminHomeSectionsScreen()),
+                  );
+                },
               ),
               const SizedBox(height: 12),
 

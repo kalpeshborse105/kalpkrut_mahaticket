@@ -7,6 +7,7 @@ import '../models/session_model.dart';
 import '../models/seat_model.dart';
 import '../models/order_model.dart';
 import '../models/ticket_model.dart';
+import '../models/home_section_model.dart';
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -325,6 +326,107 @@ class SupabaseService {
         'status': 'ERROR',
         'message': 'Scanning error: $e',
       };
+    }
+  }
+
+  Future<List<HomeSectionModel>> getHomeSections({bool visibleOnly = true}) async {
+    try {
+      var query = client.from('home_sections').select();
+      if (visibleOnly) {
+        query = query.eq('is_visible', 1);
+      }
+      final response = await query.order('sort_order', ascending: true);
+      return (response as List)
+          .map((e) => HomeSectionModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching home_sections: $e');
+      return [];
+    }
+  }
+
+  Future<bool> upsertHomeSections(List<HomeSectionModel> sections) async {
+    try {
+      final rows = sections.map((s) {
+        final json = s.toJson();
+        if (s.id <= 0) json.remove('id');
+        return json;
+      }).toList();
+      await client.from('home_sections').upsert(rows, onConflict: 'section_key');
+      return true;
+    } catch (e) {
+      debugPrint('Error upserting home_sections: $e');
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getActiveAnnouncements({String? city}) async {
+    try {
+      var query = client.from('announcements').select().eq('active', 1);
+      if (city != null && city.isNotEmpty) {
+        query = query.or('city.is.null,city.eq.$city');
+      }
+      final response = await query.order('id', ascending: false);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching announcements: $e');
+      return [];
+    }
+  }
+
+  Future<List<EventReviewModel>> getEventReviews(int eventId) async {
+    try {
+      final response = await client
+          .from('event_reviews')
+          .select()
+          .eq('event_id', eventId)
+          .order('created_at', ascending: false)
+          .limit(40);
+      return (response as List)
+          .map((e) => EventReviewModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching reviews: $e');
+      return [];
+    }
+  }
+
+  Future<bool> submitEventReview({
+    required int eventId,
+    required int userId,
+    required String userEmail,
+    required String userName,
+    required int rating,
+    required String comment,
+    String? city,
+  }) async {
+    try {
+      await client.from('event_reviews').insert({
+        'event_id': eventId,
+        'user_id': userId,
+        'user_email': userEmail,
+        'user_name': userName,
+        'rating': rating.clamp(1, 5),
+        'comment': comment.trim(),
+        'city': ?city,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error submitting review: $e');
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getPublishedVenues({String? city}) async {
+    try {
+      final hasCity = city != null && city.isNotEmpty && city.toLowerCase() != 'all';
+      final response = hasCity
+          ? await client.from('venues').select().ilike('city', city).order('name').limit(30)
+          : await client.from('venues').select().order('name').limit(30);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching venues: $e');
+      return [];
     }
   }
 

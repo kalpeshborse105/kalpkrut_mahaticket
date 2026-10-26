@@ -145,9 +145,9 @@ class BookingProvider with ChangeNotifier {
       return true;
     }
 
-    // Max 5 seats limit
+    // Max 5 seats limit (BookMyShow / TicketGhar rule)
     if (_selectedSeats.length >= 5) {
-      _conflictError = 'Maximum 5 tickets allowed per booking.';
+      _conflictError = 'max_seats';
       notifyListeners();
       return false;
     }
@@ -165,7 +165,7 @@ class BookingProvider with ChangeNotifier {
     );
 
     if (!inv.isAvailableForUser(_holdToken)) {
-      _conflictError = 'Seat ${seat.seatCode} is currently unavailable or held.';
+      _conflictError = 'seat_held:${seat.seatCode}';
       notifyListeners();
       return false;
     }
@@ -192,10 +192,21 @@ class BookingProvider with ChangeNotifier {
     _holdResult = result;
 
     if (!result.success) {
-      _conflictError = result.errorMessage;
-      // remove conflicting seats
+      final raw = (result.errorMessage ?? '').toLowerCase();
+      if (raw.contains('held') ||
+          raw.contains('another') ||
+          raw.contains('no longer available') ||
+          raw.contains('not available')) {
+        _conflictError = 'seat_conflict';
+      } else if (raw.contains('maximum') || raw.contains('max')) {
+        _conflictError = 'max_seats';
+      } else {
+        _conflictError = result.errorMessage ?? 'hold_failed';
+      }
+      // remove conflicting seats and refresh map for live availability
       _selectedSeats.clear();
       _cancelTimer();
+      await _refreshInventory();
       notifyListeners();
       return false;
     }
@@ -226,7 +237,7 @@ class BookingProvider with ChangeNotifier {
           );
         }
         _selectedSeats.clear();
-        _conflictError = 'Seat hold expired! Please select seats again.';
+        _conflictError = 'hold_expired';
         notifyListeners();
       } else {
         _secondsLeft--;

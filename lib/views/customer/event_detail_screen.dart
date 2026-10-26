@@ -5,9 +5,14 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/event_model.dart';
+import '../../data/models/home_section_model.dart';
 import '../../data/models/session_model.dart';
 import '../../data/models/venue_model.dart';
+import '../../data/services/supabase_service.dart';
+import '../../core/l10n/app_strings.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/locale_provider.dart';
 import 'seat_matrix_screen.dart';
 
 class EventDetailScreen extends StatefulWidget {
@@ -24,6 +29,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   SessionModel? _selectedSession;
   bool _descExpanded = false;
   bool _isReminderSet = false;
+  List<EventReviewModel> _reviews = [];
+  bool _reviewsLoading = true;
+  int _reviewStars = 5;
+  final _reviewController = TextEditingController();
 
   @override
   void initState() {
@@ -44,7 +53,57 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           });
         }
       });
+      _loadReviews();
     });
+  }
+
+  @override
+  void dispose() {
+    _reviewController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadReviews() async {
+    final rows = await SupabaseService().getEventReviews(widget.event.id);
+    if (!mounted) return;
+    setState(() {
+      _reviews = rows;
+      _reviewsLoading = false;
+    });
+  }
+
+  Future<void> _submitReview() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (!auth.isLoggedIn || auth.dbUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to submit a review.')),
+      );
+      return;
+    }
+    final comment = _reviewController.text.trim();
+    if (comment.isEmpty) return;
+    final ok = await SupabaseService().submitEventReview(
+      eventId: widget.event.id,
+      userId: auth.dbUserId!,
+      userEmail: auth.userEmail,
+      userName: auth.userName,
+      rating: _reviewStars,
+      comment: comment,
+    );
+    if (!mounted) return;
+    if (!mounted) return;
+    if (ok) {
+      _reviewController.clear();
+      await _loadReviews();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Review submitted. धन्यवाद!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save review. Try again.')),
+      );
+    }
   }
 
   /// Groups real sessions from the database by calendar date
@@ -98,7 +157,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       sessionsForDay = dateGroups[availableDates.first] ?? [];
     }
 
-    final String displayCategory = event.categoryMr.isNotEmpty ? event.categoryMr : event.category;
+    final locale = Provider.of<LocaleProvider>(context);
+    final s = S(locale);
+    final String displayCategory = event.displayCategory(marathi: locale.isMarathi);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -118,7 +179,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   child: CircleAvatar(
                     backgroundColor: Colors.black.withAlpha(160),
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary, size: 20),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
@@ -141,7 +202,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                               _isReminderSet
                                   ? 'रिमांडर सेट झाला! 🔔 शो सुरू होण्यापूर्वी सूचना मिळेल.'
                                   : 'रिमांडर काढला.',
-                              style: const TextStyle(color: Colors.white),
+                              style: const TextStyle(color: AppColors.textPrimary),
                             ),
                           ),
                         );
@@ -157,7 +218,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             backgroundColor: AppColors.surface,
-                            content: Text('Sharing "${event.title}"...'),
+                            content: Text(
+                              locale.t(
+                                'Sharing "${event.displayTitle(marathi: false)}"...',
+                                '"${event.displayTitle(marathi: true)}" शेअर होत आहे...',
+                              ),
+                            ),
                           ),
                         );
                       },
@@ -232,28 +298,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ),
 
-                      // Titles
+                      // Single-language title (Profile EN / मराठी)
                       Text(
-                        event.title,
+                        event.displayTitle(marathi: locale.isMarathi),
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                           letterSpacing: -0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        event.titleMr.isNotEmpty ? event.titleMr : event.title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.gold,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -281,7 +338,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -317,7 +374,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                     Text(
                                       'आगामी प्रयोग • तारीख लवकरच',
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        color: AppColors.textPrimary,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),
@@ -439,7 +496,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                             Container(
@@ -475,49 +532,33 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       ],
 
                       // 3. ABOUT THE SHOW / SYNOPSIS
-                      const Text(
-                        'कथानक व माहिती (About The Show)',
-                        style: TextStyle(
+                      Text(
+                        s.aboutShow,
+                        style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 8),
 
-                      // Marathi Description
                       Text(
-                        event.descriptionMr.isNotEmpty ? event.descriptionMr : event.description,
+                        event.displayDescription(marathi: locale.isMarathi),
                         style: const TextStyle(
                           fontSize: 13.5,
                           color: AppColors.textPrimary,
                           height: 1.5,
                         ),
-                        maxLines: _descExpanded ? null : 3,
+                        maxLines: _descExpanded ? null : 4,
                         overflow: _descExpanded ? null : TextOverflow.ellipsis,
                       ),
-
-                      // English Description if available
-                      if (event.description.isNotEmpty && event.descriptionMr.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          event.description,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            color: AppColors.textSecondary,
-                            height: 1.4,
-                          ),
-                          maxLines: _descExpanded ? null : 2,
-                          overflow: _descExpanded ? null : TextOverflow.ellipsis,
-                        ),
-                      ],
 
                       InkWell(
                         onTap: () => setState(() => _descExpanded = !_descExpanded),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Text(
-                            _descExpanded ? 'कमी माहिती (Read Less) ↑' : 'अधिक माहिती (Read More) ↓',
+                            _descExpanded ? s.readLess : s.readMore,
                             style: const TextStyle(
                               color: AppColors.primary,
                               fontWeight: FontWeight.bold,
@@ -531,18 +572,116 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
                       // 4. CAST & CREW
                       if (event.cast.isNotEmpty) ...[
-                        const Text(
-                          'कलाकार व दिग्दर्शक (Cast & Crew)',
-                          style: TextStyle(
+                        Text(
+                          s.castCrew,
+                          style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 12),
                         _buildCastList(event.cast),
                         const SizedBox(height: 20),
                       ],
+
+                      // Gallery
+                      if (event.galleryUrls.isNotEmpty) ...[
+                        Text(
+                          s.gallery,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 140,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: event.galleryUrls.length,
+                            separatorBuilder: (_, _) => const SizedBox(width: 10),
+                            itemBuilder: (context, i) {
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: CachedNetworkImage(
+                                  imageUrl: event.galleryUrls[i],
+                                  width: 200,
+                                  height: 140,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (context, url, error) => Container(width: 200, color: AppColors.surfaceLight),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
+                      // Reviews
+                      Text(
+                        s.reviews,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      const SizedBox(height: 10),
+                      if (_reviewsLoading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                        )
+                      else if (_reviews.isEmpty)
+                        const Text('अजून समीक्षा नाहीत — पहिले रिव्ह्यू लिहा!', style: TextStyle(color: AppColors.textMuted, fontSize: 13))
+                      else
+                        ..._reviews.take(5).map((r) => Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.surfaceBorder),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(r.userName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
+                                      const Spacer(),
+                                      Text('${'★' * r.rating}${'☆' * (5 - r.rating)}', style: const TextStyle(color: AppColors.gold, fontSize: 12)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(r.comment, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5, height: 1.4)),
+                                ],
+                              ),
+                            )),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: List.generate(5, (i) {
+                          final star = i + 1;
+                          return IconButton(
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => setState(() => _reviewStars = star),
+                            icon: Icon(
+                              star <= _reviewStars ? Icons.star_rounded : Icons.star_border_rounded,
+                              color: AppColors.gold,
+                            ),
+                          );
+                        }),
+                      ),
+                      TextField(
+                        controller: _reviewController,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          hintText: 'Write your review / तुमची प्रतिक्रिया लिहा',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton(
+                          onPressed: _submitReview,
+                          child: const Text('Submit Review'),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
 
                       // 5. CANCELLATION & AUDITORIUM POLICY
                       Container(
@@ -555,16 +694,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Row(
+                            Row(
                               children: [
-                                Icon(Icons.info_outline_rounded, color: AppColors.gold, size: 16),
-                                SizedBox(width: 6),
+                                const Icon(Icons.info_outline_rounded, color: AppColors.gold, size: 16),
+                                const SizedBox(width: 6),
                                 Text(
-                                  'प्रवेश व रद्द करण्याचे नियम (Entry Policy)',
-                                  style: TextStyle(
+                                  s.entryPolicy,
+                                  style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ],
@@ -584,8 +723,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         ),
                       ),
 
-                      // Bottom spacing for sticky bar (prevents content cutoff on Android)
-                      const SizedBox(height: 110),
+                      // Extra space so sticky CTA + app bottom nav never cover content
+                      const SizedBox(height: 150),
                     ],
                   ),
                 ),
@@ -593,13 +732,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             ],
           ),
 
-          // Bottom Sticky CTA Bar (Android First & SafeArea Protected)
+          // Bottom Sticky CTA Bar (above app bottom navigation; does not hide tabs)
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 border: const Border(
@@ -615,6 +754,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               ),
               child: SafeArea(
                 top: false,
+                minimum: EdgeInsets.zero,
                 child: Row(
                   children: [
                     // Showtime & Venue Summary
@@ -645,7 +785,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             style: const TextStyle(
                               fontSize: 13.5,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ],
@@ -689,14 +829,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           );
                         }
                       },
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.event_seat_rounded, size: 17),
-                          SizedBox(width: 6),
+                          const Icon(Icons.event_seat_rounded, size: 17),
+                          const SizedBox(width: 6),
                           Text(
-                            'जागा निवडा (Select Seats)',
-                            style: TextStyle(
+                            s.selectSeats,
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13.5,
                             ),
@@ -755,7 +895,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       style: const TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -836,7 +976,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           style: TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.w600,
-                            color: isSelected ? Colors.white70 : AppColors.textMuted,
+                            color: isSelected ? AppColors.textSecondary : AppColors.textMuted,
                           ),
                         ),
                       ],
@@ -890,7 +1030,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10.5, color: Colors.white, fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontSize: 10.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                 ),
                 if (roleStr.isNotEmpty)
                   Text(
@@ -929,7 +1069,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: isHighlight ? FontWeight.bold : FontWeight.w500,
-              color: isHighlight ? AppColors.gold : Colors.white70,
+              color: isHighlight ? AppColors.gold : AppColors.textSecondary,
             ),
           ),
         ],

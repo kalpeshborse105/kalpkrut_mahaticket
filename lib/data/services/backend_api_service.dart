@@ -114,6 +114,28 @@ class BackendApiService {
   Future<Map<String, dynamic>> requestTicketEmail(String ticketCode) {
     return _post('/api/tickets/${Uri.encodeComponent(ticketCode)}/email', {});
   }
+
+  /// Authoritative gate scan (MTGRP/MTSEC decrypt + event/session/seat match).
+  Future<Map<String, dynamic>> verifyGateScan({
+    required String ticketCodeOrPayload,
+    required String gateName,
+    int? scannerUserId,
+    int? targetEventId,
+    int? targetSessionId,
+    int? scannerOrganizerId,
+    bool requireScope = false,
+  }) {
+    return _post('/api/scanner/verify', {
+      'ticketCodeOrPayload': ticketCodeOrPayload,
+      'gateName': gateName,
+      'scannerUserId': ?scannerUserId,
+      'targetEventId': ?targetEventId,
+      'targetSessionId': ?targetSessionId,
+      'scannerOrganizerId': ?scannerOrganizerId,
+      'requireScope': requireScope,
+      'scannerDevice': 'MahaTicket Flutter Gate',
+    });
+  }
 }
 
 class BackendApiException implements Exception {

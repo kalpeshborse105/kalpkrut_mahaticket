@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/l10n/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/order_model.dart';
 import '../../data/models/ticket_model.dart';
+import '../../providers/locale_provider.dart';
 
 class TicketViewScreen extends StatelessWidget {
   final OrderModel order;
@@ -25,64 +28,218 @@ class TicketViewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = S(context.watch<LocaleProvider>());
     final firstTicket = tickets.isNotEmpty ? tickets.first : null;
     final allSeatCodes = tickets.map((t) => t.seatCode).join(', ');
+    final qrData = firstTicket?.displayQrPayload ?? order.orderNumber;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Digital M-Ticket Pass'),
+        title: Text(s.digitalPass),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.close),
-            onPressed: () {
-              Navigator.popUntil(context, (route) => route.isFirst);
-            },
+            onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         child: Column(
           children: [
-            // Success Confirmation Banner
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              margin: const EdgeInsets.only(bottom: 16),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: AppColors.success.withAlpha(40),
+                color: AppColors.success.withAlpha(24),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.success),
+                border: Border.all(color: AppColors.success.withAlpha(120)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.check_circle_rounded, color: AppColors.success, size: 22),
-                  SizedBox(width: 10),
+                  const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Booking Confirmed! M-Ticket issued successfully.',
-                      style: TextStyle(
+                      s.bookingConfirmed,
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 16),
 
-            // Perforated Digital Ticket Pass
-            _buildPerforatedTicket(context, allSeatCodes, firstTicket),
-            const SizedBox(height: 24),
-
-            // Action Buttons
+            // Light ticket pass (TicketGhar MahaTicketPass style)
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.surfaceBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(18),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppColors.primary, AppColors.primaryLight],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(19)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withAlpha(40),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                order.orderNumber,
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${tickets.length} ${context.watch<LocaleProvider>().t('pass', 'पास')}',
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          eventTitle ?? 'Event',
+                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        if (venueName != null && venueName!.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on_outlined, color: Colors.white70, size: 16),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  venueName!,
+                                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+                    child: Row(
+                      children: [
+                        Expanded(child: _metaBlock(context.watch<LocaleProvider>().t('Date', 'तारीख'), showDate ?? '—')),
+                        Expanded(child: _metaBlock(context.watch<LocaleProvider>().t('Time', 'वेळ'), showTime ?? '—')),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.canvasLight,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${context.watch<LocaleProvider>().t('Seats', 'आसने')}: $allSeatCodes',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                          ),
+                          Text(
+                            '₹${(order.grandTotal / 100).toStringAsFixed(0)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  _perforation(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 20),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.surfaceBorder),
+                          ),
+                          child: QrImageView(
+                            data: qrData,
+                            version: QrVersions.auto,
+                            size: 180,
+                            backgroundColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          firstTicket?.ticketCode ?? order.orderNumber,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            letterSpacing: 1.5,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryDark,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          (firstTicket?.displayQrPayload.startsWith('MTGRP:') ?? false)
+                              ? context.watch<LocaleProvider>().t(
+                                    '1 group QR for all ${tickets.length} seats',
+                                    'सर्व ${tickets.length} आसनांसाठी १ ग्रुप QR',
+                                  )
+                              : context.watch<LocaleProvider>().t(
+                                    'Show this QR at the gate',
+                                    'गेटवर हा QR दाखवा',
+                                  ),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.share_outlined, size: 18),
-                    label: const Text('Share Pass'),
+                    label: Text(s.sharePass),
                     onPressed: () => _shareTicket(context, allSeatCodes),
                   ),
                 ),
@@ -90,288 +247,62 @@ class TicketViewScreen extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.home_rounded, size: 18),
-                    label: const Text('Back to Home'),
-                    onPressed: () {
-                      Navigator.popUntil(context, (route) => route.isFirst);
-                    },
+                    label: Text(s.backHome),
+                    onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 30),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPerforatedTicket(
-    BuildContext context,
-    String allSeatCodes,
-    TicketModel? firstTicket,
-  ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.surfaceBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(150),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Header: Brand & Order No
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLight,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(Icons.confirmation_number, color: Colors.white, size: 16),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'MahaTicket M-Pass',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  order.orderNumber,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.gold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Main Ticket Info
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (eventTitle != null && eventTitle!.isNotEmpty) ...[
-                  Text(
-                    eventTitle!,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                ],
-                if (venueName != null && venueName!.isNotEmpty) ...[
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, size: 14, color: AppColors.primary),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          venueName!,
-                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                if ((showDate != null && showDate!.isNotEmpty) || (showTime != null && showTime!.isNotEmpty)) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withAlpha(25),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.primary.withAlpha(50)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.access_time_filled, size: 16, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${showDate ?? ''} • ${showTime ?? ''}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _infoColumn('AUDITORIUM GATE', 'Gate 1 (Main Entrance)'),
-                    _infoColumn('TICKETS', '${order.ticketCount} Seat(s)'),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _infoColumn('SEAT NUMBERS', allSeatCodes, highlight: true),
-                    _infoColumn('BOOKED FOR', order.userName),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _infoColumn('PAYMENT STATUS', 'PAID (Razorpay)', color: AppColors.success),
-                    _infoColumn('AMOUNT', '₹${order.grandTotalRupees.toStringAsFixed(2)}'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Perforation cut line with side notches
-          _buildPerforationDivider(),
-
-          // QR Code Section
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(60),
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
-                  child: QrImageView(
-                    data: firstTicket?.qrPayload ?? 'MHTK|${order.orderNumber}|VALID',
-                    version: QrVersions.auto,
-                    size: 180.0,
-                    backgroundColor: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  firstTicket?.ticketCode ?? 'TK-2026-PASS',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    letterSpacing: 2,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.gold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Scan this QR code at the gate scanner for entry.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: AppColors.textMuted),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoColumn(String label, String value, {bool highlight = false, Color? color}) {
+  Widget _metaBlock(String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10, letterSpacing: 0.8, color: AppColors.textMuted),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: color ?? (highlight ? AppColors.gold : Colors.white),
-          ),
-        ),
+        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
       ],
     );
   }
 
-  Widget _buildPerforationDivider() {
-    return SizedBox(
-      height: 30,
-      child: Stack(
-        alignment: Alignment.center,
+  Widget _perforation() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
         children: [
-          // Dashed center line
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final boxWidth = constraints.constrainWidth();
-              final dashCount = (boxWidth / 10).floor();
-              return Flex(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                direction: Axis.horizontal,
-                children: List.generate(dashCount, (_) {
-                  return const SizedBox(
-                    width: 5,
-                    height: 1.5,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(color: AppColors.surfaceBorder),
-                    ),
-                  );
-                }),
-              );
-            },
-          ),
-          // Left Notch cutout
-          Positioned(
-            left: -15,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: const BoxDecoration(
-                color: AppColors.background,
-                shape: BoxShape.circle,
-              ),
+          Container(
+            width: 14,
+            height: 28,
+            decoration: const BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.horizontal(right: Radius.circular(14)),
             ),
           ),
-          // Right Notch cutout
-          Positioned(
-            right: -15,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: const BoxDecoration(
-                color: AppColors.background,
-                shape: BoxShape.circle,
-              ),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final count = (constraints.maxWidth / 8).floor();
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(
+                    count,
+                    (_) => Container(width: 4, height: 1.5, color: AppColors.surfaceBorder),
+                  ),
+                );
+              },
+            ),
+          ),
+          Container(
+            width: 14,
+            height: 28,
+            decoration: const BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.horizontal(left: Radius.circular(14)),
             ),
           ),
         ],
@@ -379,19 +310,13 @@ class TicketViewScreen extends StatelessWidget {
     );
   }
 
-  void _shareTicket(BuildContext context, String seats) async {
-    final text = 'My MahaTicket Pass for Order #${order.orderNumber}! Seats: $seats.';
-    final whatsappUrl = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}');
-    try {
-      if (await canLaunchUrl(whatsappUrl)) {
-        await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
-      }
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ticket pass copied: $text')),
-        );
-      }
+  Future<void> _shareTicket(BuildContext context, String seats) async {
+    final text = Uri.encodeComponent(
+      'MahaTicket Pass\n${eventTitle ?? ''}\n${venueName ?? ''}\n$showDate $showTime\nSeats: $seats\n${order.orderNumber}',
+    );
+    final uri = Uri.parse('https://wa.me/?text=$text');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 }

@@ -52,6 +52,7 @@ class EventModel {
   final String posterUrl;
   final String? bannerUrl;
   final String? trailerUrl;
+  final List<String> galleryUrls;
   final int featured;
   final String? tag;
   final List<CastCrewMember> castCrew;
@@ -79,6 +80,7 @@ class EventModel {
     required this.posterUrl,
     this.bannerUrl,
     this.trailerUrl,
+    this.galleryUrls = const [],
     this.featured = 0,
     this.tag,
     this.castCrew = const [],
@@ -105,6 +107,19 @@ class EventModel {
       } catch (_) {}
     }
 
+    List<String> gallery = [];
+    if (json['gallery_urls'] != null) {
+      try {
+        dynamic parsed = json['gallery_urls'];
+        if (parsed is String) {
+          parsed = jsonDecode(parsed);
+        }
+        if (parsed is List) {
+          gallery = parsed.map((e) => e.toString()).where((u) => u.isNotEmpty).toList();
+        }
+      } catch (_) {}
+    }
+
     return EventModel(
       id: json['id'] is int ? json['id'] : int.tryParse('${json['id']}') ?? 0,
       organizerId: json['organizer_id'] ?? 1,
@@ -122,6 +137,7 @@ class EventModel {
       posterUrl: json['poster_url'] ?? 'https://images.unsplash.com/photo-1514306191717-452ec28c7814?w=1000',
       bannerUrl: json['banner_url'],
       trailerUrl: json['trailer_url'],
+      galleryUrls: gallery,
       featured: json['featured'] ?? 0,
       tag: json['tag'],
       castCrew: castList,
@@ -171,5 +187,35 @@ class EventModel {
   String get venueDisplayName =>
       venue != null ? (venue!.nameMr.isNotEmpty ? venue!.nameMr : venue!.name) : '';
   String get venueCity => venue?.city ?? 'Maharashtra';
+
+  /// Single-language title (never EN+MR together).
+  String displayTitle({required bool marathi}) {
+    if (marathi) {
+      return titleMr.trim().isNotEmpty ? titleMr : title;
+    }
+    return title.trim().isNotEmpty ? title : titleMr;
+  }
+
+  String displayDescription({required bool marathi}) {
+    if (marathi) {
+      return descriptionMr.trim().isNotEmpty ? descriptionMr : description;
+    }
+    return description.trim().isNotEmpty ? description : descriptionMr;
+  }
+
+  String displayCategory({required bool marathi}) {
+    if (marathi) {
+      return categoryMr.trim().isNotEmpty ? categoryMr : category;
+    }
+    return category.trim().isNotEmpty ? category : categoryMr;
+  }
+
+  String displayVenue({required bool marathi}) {
+    if (venue == null) return '';
+    if (marathi) {
+      return venue!.nameMr.trim().isNotEmpty ? venue!.nameMr : venue!.name;
+    }
+    return venue!.name.trim().isNotEmpty ? venue!.name : venue!.nameMr;
+  }
 }
 

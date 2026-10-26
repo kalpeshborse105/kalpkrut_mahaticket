@@ -1,91 +1,84 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// MahaTicket light theme — TicketGhar mobile parity.
 class AppColors {
-  // MahaTicket Signature Warm Orange / Charcoal Theme (BookMyShow + TicketGhar hybrid)
-  static const Color background = Color(0xFF0F172A); // Rich Slate Black
-  static const Color surface = Color(0xFF1E293B); // Slate Surface
-  static const Color surfaceLight = Color(0xFF334155); // Highlight surface
-  static const Color surfaceBorder = Color(0xFF475569); // Subtle Slate border
-  static const Color canvasLight = Color(0xFFFFF7ED); // Warm cream accent
+  static const Color background = Color(0xFFFAFAFA);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color surfaceLight = Color(0xFFF1F5F9);
+  static const Color surfaceBorder = Color(0xFFE5E5E5);
+  static const Color canvasLight = Color(0xFFFFF7ED);
 
-  // Brand Orange Accent (MahaTicket Warm Orange)
-  static const Color primary = Color(0xFFEA580C); // Warm Orange
-  static const Color primaryDark = Color(0xFFC2410C); // Deep Burnt Orange
-  static const Color primaryLight = Color(0xFFF97316); // Bright Orange
+  static const Color primary = Color(0xFFEA580C);
+  static const Color primaryDark = Color(0xFFC2410C);
+  static const Color primaryLight = Color(0xFFF97316);
   static const Color primaryGradientStart = Color(0xFFEA580C);
-  static const Color primaryGradientEnd = Color(0xFFF59E0B);
+  static const Color primaryGradientEnd = Color(0xFFF97316);
 
-  // Secondary Accents & Highlights
-  static const Color accent = Color(0xFFE11D48); // Rose Crimson
-  static const Color gold = Color(0xFFF59E0B); // Amber Gold
+  static const Color accent = Color(0xFFE11D48);
+  static const Color gold = Color(0xFFF59E0B);
   static const Color goldLight = Color(0xFFFDE68A);
   static const Color cyan = Color(0xFF06B6D4);
 
-  // Seat Status Colors
-  static const Color seatAvailable = Color(0xFF1E293B);
-  static const Color seatAvailableBorder = Color(0xFF64748B);
-  static const Color seatSelected = Color(0xFFEA580C); // Brand Orange
-  static const Color seatHeld = Color(0xFFF59E0B); // Amber warning
-  static const Color seatBooked = Color(0xFF0F172A); // Dark muted
-  static const Color seatVip = Color(0xFFF59E0B); // Royal Gold
+  static const Color seatAvailable = Color(0xFFFFFFFF);
+  static const Color seatAvailableBorder = Color(0xFF94A3B8);
+  static const Color seatSelected = Color(0xFFEA580C);
+  static const Color seatHeld = Color(0xFFF59E0B);
+  static const Color seatBooked = Color(0xFFCBD5E1);
+  static const Color seatVip = Color(0xFFF59E0B);
 
-  // Feedback Colors
-  static const Color success = Color(0xFF10B981); // Emerald Green
+  static const Color success = Color(0xFF10B981);
   static const Color neonGreen = Color(0xFF10B981);
-  static const Color error = Color(0xFFEF4444); // Crimson Error
-  static const Color warning = Color(0xFFF59E0B); // Amber Warning
+  static const Color error = Color(0xFFEF4444);
+  static const Color warning = Color(0xFFF59E0B);
 
-  // Text Colors
-  static const Color textPrimary = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color textMuted = Color(0xFF64748B);
+  static const Color textPrimary = Color(0xFF171717);
+  static const Color textSecondary = Color(0xFF737373);
+  static const Color textMuted = Color(0xFF94A3B8);
+  static const Color onPrimary = Color(0xFFFFFFFF);
+}
+
+class AppSpacing {
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
+  static const double xl = 20;
+  static const double xxl = 24;
 }
 
 class AppTheme {
-  static ThemeData get darkTheme {
-    return ThemeData(
-      brightness: Brightness.dark,
+  static ThemeData get lightTheme {
+    final base = ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
       scaffoldBackgroundColor: AppColors.background,
       primaryColor: AppColors.primary,
-      colorScheme: const ColorScheme.dark(
+      colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.gold,
         surface: AppColors.surface,
         error: AppColors.error,
-        onPrimary: Colors.white,
+        onPrimary: AppColors.onPrimary,
         onSurface: AppColors.textPrimary,
       ),
       fontFamily: GoogleFonts.outfit().fontFamily,
-      textTheme: const TextTheme(
-        displayLarge: TextStyle(
-          color: AppColors.textPrimary,
-          fontWeight: FontWeight.bold,
-          letterSpacing: -0.5,
-        ),
-        displayMedium: TextStyle(
-          color: AppColors.textPrimary,
-          fontWeight: FontWeight.bold,
-          letterSpacing: -0.5,
-        ),
-        titleLarge: TextStyle(
-          color: AppColors.textPrimary,
-          fontWeight: FontWeight.bold,
-        ),
-        bodyLarge: TextStyle(
-          color: AppColors.textPrimary,
-        ),
-        bodyMedium: TextStyle(
-          color: AppColors.textSecondary,
-        ),
+    );
+
+    return base.copyWith(
+      textTheme: base.textTheme.apply(
+        bodyColor: AppColors.textPrimary,
+        displayColor: AppColors.textPrimary,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
+        scrolledUnderElevation: 0.5,
         centerTitle: false,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
         titleTextStyle: TextStyle(
-          color: Colors.white,
+          color: AppColors.textPrimary,
           fontSize: 18,
           fontWeight: FontWeight.bold,
         ),
@@ -96,13 +89,15 @@ class AppTheme {
         unselectedItemColor: AppColors.textMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
+        selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        unselectedLabelStyle: TextStyle(fontSize: 11),
       ),
       cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.surfaceBorder, width: 0.8),
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AppColors.surfaceBorder),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -110,22 +105,15 @@ class AppTheme {
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          textStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
           side: const BorderSide(color: AppColors.primary),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -139,7 +127,7 @@ class AppTheme {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.surfaceBorder, width: 0.8),
+          borderSide: const BorderSide(color: AppColors.surfaceBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -147,6 +135,16 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
+      dividerTheme: const DividerThemeData(color: AppColors.surfaceBorder, thickness: 1),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.textPrimary,
+        contentTextStyle: const TextStyle(color: Colors.white),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
     );
   }
+
+  /// Kept for any legacy references; app uses [lightTheme].
+  static ThemeData get darkTheme => lightTheme;
 }

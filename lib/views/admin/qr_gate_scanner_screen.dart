@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/ticket_crypto.dart';
+import '../../data/services/backend_api_service.dart';
 import '../../data/services/supabase_service.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/booking_provider.dart';
 
 class QrGateScannerScreen extends StatefulWidget {
   const QrGateScannerScreen({super.key});
@@ -15,10 +18,12 @@ class QrGateScannerScreen extends StatefulWidget {
 class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
   final TextEditingController _codeController = TextEditingController();
   final SupabaseService _supabaseService = SupabaseService();
+  final BackendApiService _api = BackendApiService();
   MobileScannerController? _cameraController;
 
   bool _isVerifying = false;
   bool _cameraEnabled = !kIsWeb;
+  bool _requireScope = true;
   Map<String, dynamic>? _lastScanResult;
   String _selectedGate = 'Gate 1 (Main Entrance)';
   String? _lastScannedRaw;
@@ -58,35 +63,86 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
     });
 
     try {
-      String ticketCode = input;
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final booking = Provider.of<BookingProvider>(context, listen: false);
+      final targetEventId = booking.selectedEvent?.id;
+      final targetSessionId = booking.selectedSession?.id;
 
-      if (input.startsWith('MTSEC:v1:') || input.startsWith('MTGRP:v1:')) {
-        final parts = input.split(':');
-        if (parts.length >= 3) {
-          ticketCode = parts[2];
-        }
-      } else if (input.startsWith('MHTK|')) {
-        final verified = TicketCrypto.verifyTicketQrPayload(input);
-        if (verified == null || verified['isValid'] != true) {
+      // Prefer TicketGhar authoritative scanner (MTGRP decrypt + event/session match)
+      try {
+        final apiRes = await _api.verifyGateScan(
+          ticketCodeOrPayload: input,
+          gateName: _selectedGate,
+          scannerUserId: auth.dbUserId,
+          targetEventId: targetEventId,
+          targetSessionId: targetSessionId,
+          requireScope: _requireScope && targetEventId != null && targetSessionId != null,
+        );
+
+        final valid = apiRes['valid'] == true || apiRes['success'] == true;
+        final scanResult = (apiRes['scanResult'] ?? apiRes['status'] ?? '').toString();
+        final ticket = apiRes['ticket'] ?? apiRes['pass'] ?? apiRes;
+        final seats = apiRes['seatCodes'] ??
+            ticket['seats'] ??
+            ticket['seat'] ??
+            '';
+
+        setState(() {
+          _lastScanResult = {
+            'success': valid,
+            'status': scanResult.isNotEmpty ? scanResult : (valid ? 'SUCCESS' : 'REJECTED'),
+            'message': apiRes['message']?.toString() ??
+                (valid
+                    ? 'Entry approved — seats, showtime and venue matched.'
+                    : 'Scan rejected by server.'),
+            'event': ticket['event'] ?? ticket['eventTitle'],
+            'venue': ticket['venue'] ?? ticket['venueName'],
+            'showtime': ticket['showtimeLabel'] ?? ticket['showtime'],
+            'seats': seats is List ? seats.join(', ') : seats.toString(),
+            'isGroup': apiRes['isGroup'] == true,
+            'ticketCount': apiRes['totalSeats'] ?? apiRes['ticketCount'],
+          };
+        });
+        return;
+      } on BackendApiException catch (e) {
+        // Fall through to RPC for plain ticket codes when API unreachable
+        debugPrint('Scanner API failed, falling back to RPC: $e');
+        if (input.startsWith('MTGRP:')) {
           setState(() {
             _lastScanResult = {
               'success': false,
-              'status': 'COUNTERFEIT',
-              'message': 'Cryptographic verification failed: Tampered or invalid QR payload!',
+              'status': 'API_REQUIRED',
+              'message':
+                  'Group QR (MTGRP) must be verified by MahaTicket server. Check API connectivity.\n${e.message}',
             };
           });
           return;
         }
-        ticketCode = verified['ticketCode'];
+      }
+
+      // RPC fallback for plain TK- codes only
+      String ticketCode = input;
+      if (input.startsWith('MTSEC:v1:')) {
+        final parts = input.split(':');
+        if (parts.length >= 3) ticketCode = parts[2];
       }
 
       final result = await _supabaseService.validateAndScanTicket(
         ticketCode: ticketCode,
         gateName: _selectedGate,
+        scannerUserId: auth.dbUserId,
       );
 
       setState(() {
-        _lastScanResult = result;
+        _lastScanResult = {
+          'success': result['success'] == true,
+          'status': result['status'] ?? '',
+          'message': result['message'] ?? '',
+          'seats': result['ticket']?.seatCode,
+          'event': null,
+          'venue': null,
+          'showtime': null,
+        };
       });
     } catch (e) {
       setState(() {
@@ -115,6 +171,10 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final booking = Provider.of<BookingProvider>(context);
+    final scopedEvent = booking.selectedEvent?.title;
+    final scopedSession = booking.selectedSession?.sessionStartTime;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Auditorium Gate Validator'),
@@ -143,6 +203,35 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.surfaceBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Show lock (event + session)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(
+                    scopedEvent != null && scopedSession != null
+                        ? '$scopedEvent • ${scopedSession.toLocal()}'
+                        : 'Open an event showtime first for strict venue/date/time match, or disable scope below.',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Require event/session match', style: TextStyle(color: Colors.white, fontSize: 13)),
+                    value: _requireScope,
+                    onChanged: (v) => setState(() => _requireScope = v),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: AppColors.surface,
@@ -162,9 +251,7 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
                       dropdownColor: AppColors.surfaceLight,
                       underline: const SizedBox(),
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      items: _gates.map((g) {
-                        return DropdownMenuItem(value: g, child: Text(g));
-                      }).toList(),
+                      items: _gates.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
                       onChanged: (val) {
                         if (val != null) setState(() => _selectedGate = val);
                       },
@@ -174,27 +261,22 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
             if (_cameraEnabled && _cameraController != null) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: SizedBox(
                   height: 240,
                   width: double.infinity,
-                  child: MobileScanner(
-                    controller: _cameraController,
-                    onDetect: _onDetect,
-                  ),
+                  child: MobileScanner(controller: _cameraController, onDetect: _onDetect),
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Point camera at MTSEC / MTGRP / ticket QR. Duplicate scans are rejected by the server.',
+                'Scan 1 group QR (MTGRP) for up to 5 seats — server checks event, showtime, venue & seats.',
                 style: TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
               const SizedBox(height: 16),
             ],
-
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -205,10 +287,7 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Scan or Enter Ticket Code',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
+                  const Text('Scan or Enter Ticket / Group QR', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -217,7 +296,7 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
                           controller: _codeController,
                           style: const TextStyle(color: Colors.white),
                           decoration: const InputDecoration(
-                            hintText: 'e.g. MT-TK-… or MTSEC:v1:…',
+                            hintText: 'MTGRP:v1:… or MTSEC:v1:… or MT-TK-…',
                             prefixIcon: Icon(Icons.qr_code, size: 20),
                           ),
                           onSubmitted: _verifyTicket,
@@ -225,16 +304,9 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
                       ),
                       const SizedBox(width: 10),
                       ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                        ),
                         onPressed: _isVerifying ? null : () => _verifyTicket(_codeController.text),
                         child: _isVerifying
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                             : const Text('Verify'),
                       ),
                     ],
@@ -255,8 +327,6 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
     final isSuccess = res['success'] == true;
     final status = res['status'] ?? '';
     final message = res['message'] ?? '';
-    final ticket = res['ticket'];
-
     final Color statusColor = isSuccess
         ? AppColors.success
         : (status == 'ALREADY_USED' ? AppColors.warning : AppColors.error);
@@ -271,55 +341,33 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
       ),
       child: Column(
         children: [
-          Icon(
-            isSuccess ? Icons.check_circle_outline : Icons.cancel_outlined,
-            color: statusColor,
-            size: 54,
-          ),
+          Icon(isSuccess ? Icons.check_circle_outline : Icons.cancel_outlined, color: statusColor, size: 54),
           const SizedBox(height: 12),
           Text(
             isSuccess ? 'ACCESS GRANTED' : 'ENTRY REJECTED: $status',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: statusColor,
-              letterSpacing: 1,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: statusColor, letterSpacing: 1),
           ),
           const SizedBox(height: 8),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: Colors.white),
-          ),
-          if (ticket != null) ...[
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Attendee Name:', style: TextStyle(color: AppColors.textMuted)),
-                Text(ticket.attendeeName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Seat Code:', style: TextStyle(color: AppColors.textMuted)),
-                Text(ticket.seatCode, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.gold)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Ticket Code:', style: TextStyle(color: AppColors.textMuted)),
-                Text(ticket.ticketCode, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-              ],
-            ),
-          ],
+          Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Colors.white)),
+          const SizedBox(height: 12),
+          if (res['event'] != null) _metaRow('Event', '${res['event']}'),
+          if (res['venue'] != null) _metaRow('Venue', '${res['venue']}'),
+          if (res['showtime'] != null) _metaRow('Showtime', '${res['showtime']}'),
+          if (res['seats'] != null && '${res['seats']}'.isNotEmpty) _metaRow('Seats', '${res['seats']}'),
+          if (res['isGroup'] == true) _metaRow('Pass type', 'Group QR (${res['ticketCount'] ?? ''} seats)'),
+        ],
+      ),
+    );
+  }
+
+  Widget _metaRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('$label:', style: const TextStyle(color: AppColors.textMuted)),
+          Flexible(child: Text(value, textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white))),
         ],
       ),
     );

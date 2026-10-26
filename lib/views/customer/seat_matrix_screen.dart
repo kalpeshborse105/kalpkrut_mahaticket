@@ -1,17 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import '../../core/l10n/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../data/models/seat_model.dart';
 import 'checkout_screen.dart';
 
 class SeatMatrixScreen extends StatelessWidget {
   const SeatMatrixScreen({super.key});
 
+  String _localizeConflict(String? code, S s) {
+    if (code == null) return '';
+    if (code == 'max_seats') return s.maxSeats;
+    if (code == 'seat_conflict') return s.seatConflict;
+    if (code == 'hold_expired') return s.holdExpired;
+    if (code == 'hold_failed') {
+      return s.locale.t('Seat reservation failed. Try again.', 'आसन आरक्षण अयशस्वी. पुन्हा प्रयत्न करा.');
+    }
+    if (code.startsWith('seat_held:')) {
+      return s.seatHeld(code.substring('seat_held:'.length));
+    }
+    // Strip parenthetical bilingual leftovers from older server messages
+    return code.replaceAll(RegExp(r'\s*\([^)]*\)\s*'), ' ').trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     final booking = Provider.of<BookingProvider>(context);
+    final locale = Provider.of<LocaleProvider>(context);
+    final s = S(locale);
     final event = booking.selectedEvent;
     final session = booking.selectedSession;
 
@@ -26,7 +45,7 @@ class SeatMatrixScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              event?.title ?? 'Seat Selection',
+              event?.displayTitle(marathi: locale.isMarathi) ?? s.selectSeats,
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -75,48 +94,45 @@ class SeatMatrixScreen extends StatelessWidget {
         ],
       ),
       body: booking.isLoading
-          ? const Center(
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: AppColors.primary),
-                  SizedBox(height: 16),
+                  const CircularProgressIndicator(color: AppColors.primary),
+                  const SizedBox(height: 16),
                   Text(
-                    'आसन व्यवस्था लोड होत आहे... (Loading seat map)',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    s.loadingSeats,
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   ),
                 ],
               ),
             )
           : Column(
               children: [
-                // Conflict or error banner if any
                 if (booking.conflictError != null)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                    color: AppColors.error.withAlpha(220),
+                    color: AppColors.error,
                     child: Row(
                       children: [
                         const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            booking.conflictError!,
+                            _localizeConflict(booking.conflictError, s),
                             style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],
                     ),
                   ),
-
-                // Seat Legend
-                _buildLegend(),
+                _buildLegend(s),
 
                 // Real Interactive Zoomable Auditorium Layout
                 Expanded(
                   child: booking.venueSeats.isEmpty
-                      ? _buildEmptySeatsView()
+                      ? _buildEmptySeatsView(context)
                       : InteractiveViewer(
                           minScale: 0.5,
                           maxScale: 2.8,
@@ -146,7 +162,8 @@ class SeatMatrixScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptySeatsView() {
+  Widget _buildEmptySeatsView(BuildContext context) {
+    final s = S(Provider.of<LocaleProvider>(context, listen: false));
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -155,15 +172,18 @@ class SeatMatrixScreen extends StatelessWidget {
           children: [
             Icon(Icons.event_seat_outlined, size: 64, color: AppColors.textMuted.withAlpha(120)),
             const SizedBox(height: 16),
-            const Text(
-              'आसन व्यवस्था उपलब्ध नाही',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            Text(
+              s.locale.t('Seat map not available', 'आसन व्यवस्था उपलब्ध नाही'),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'या थिएटरसाठी डिजिटल सीटमॅप अद्याप कॉन्फिगर केलेले नाही.',
+            Text(
+              s.locale.t(
+                'Digital seat map is not configured for this theatre yet.',
+                'या थिएटरसाठी डिजिटल सीटमॅप अद्याप कॉन्फिगर केलेले नाही.',
+              ),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -171,17 +191,20 @@ class SeatMatrixScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLegend() {
+  Widget _buildLegend(S s) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      color: AppColors.surface,
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.surfaceBorder)),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _legendItem('Available', AppColors.seatAvailableBorder, false),
-          _legendItem('Selected', AppColors.primary, true),
-          _legendItem('Held (Locked)', AppColors.gold, true),
-          _legendItem('Booked', AppColors.seatBooked, true),
+          _legendItem(s.available, AppColors.seatAvailableBorder, false),
+          _legendItem(s.selected, AppColors.primary, true),
+          _legendItem(s.reserved, AppColors.gold, true),
+          _legendItem(s.booked, AppColors.seatBooked, true),
         ],
       ),
     );
@@ -227,14 +250,19 @@ class SeatMatrixScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'STAGE / SCREEN (रंगमंच)',
-          style: TextStyle(
-            fontSize: 10,
-            letterSpacing: 3,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textMuted,
-          ),
+        Builder(
+          builder: (context) {
+            final s = S(Provider.of<LocaleProvider>(context));
+            return Text(
+              s.stageThisWay,
+              style: const TextStyle(
+                fontSize: 10,
+                letterSpacing: 2,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textMuted,
+              ),
+            );
+          },
         ),
       ],
     );
@@ -289,7 +317,7 @@ class SeatMatrixScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.surfaceLight,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white12),
+                  border: Border.all(color: AppColors.surfaceBorder),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -299,7 +327,7 @@ class SeatMatrixScreen extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -432,7 +460,7 @@ class SeatMatrixScreen extends StatelessWidget {
       innerWidget = const Icon(Icons.close, size: 9, color: AppColors.textMuted);
     } else if (isBlocked) {
       seatColor = AppColors.surfaceLight;
-      borderColor = Colors.white10;
+      borderColor = AppColors.surfaceBorder;
       innerWidget = const Icon(Icons.block, size: 8, color: AppColors.textMuted);
     } else if (isHeldByOther) {
       seatColor = AppColors.gold.withAlpha(50);
@@ -516,7 +544,7 @@ class SeatMatrixScreen extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ],

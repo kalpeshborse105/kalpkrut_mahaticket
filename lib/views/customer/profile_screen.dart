@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/l10n/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../admin/admin_dashboard_screen.dart';
 import '../admin/organizer_console_screen.dart';
 import '../admin/qr_gate_scanner_screen.dart';
@@ -19,45 +21,40 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String _selectedLanguage = 'मराठी (Marathi)';
-
   void _showLanguageDialog() {
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
     showDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: AppColors.surface,
-          title: const Text(
-            'भाषा निवडा (Select Language)',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+          title: Text(
+            locale.t('Select Language', 'भाषा निवडा'),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                title: const Text('मराठी (Marathi)'),
+                title: const Text('मराठी', style: TextStyle(color: AppColors.textPrimary)),
                 leading: Icon(
-                  _selectedLanguage.startsWith('मराठी')
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
+                  locale.isMarathi ? Icons.radio_button_checked : Icons.radio_button_unchecked,
                   color: AppColors.primary,
                 ),
-                onTap: () {
-                  setState(() => _selectedLanguage = 'मराठी (Marathi)');
-                  Navigator.pop(ctx);
+                onTap: () async {
+                  await locale.setLanguage('mr');
+                  if (ctx.mounted) Navigator.pop(ctx);
                 },
               ),
               ListTile(
-                title: const Text('English'),
+                title: const Text('English', style: TextStyle(color: AppColors.textPrimary)),
                 leading: Icon(
-                  _selectedLanguage.startsWith('English')
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
+                  locale.isEnglish ? Icons.radio_button_checked : Icons.radio_button_unchecked,
                   color: AppColors.primary,
                 ),
-                onTap: () {
-                  setState(() => _selectedLanguage = 'English');
-                  Navigator.pop(ctx);
+                onTap: () async {
+                  await locale.setLanguage('en');
+                  if (ctx.mounted) Navigator.pop(ctx);
                 },
               ),
             ],
@@ -67,16 +64,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  String _getRoleLabel(UserRole role) {
+  String _getRoleLabel(UserRole role, LocaleProvider locale) {
     switch (role) {
       case UserRole.superAdmin:
-        return 'सुपर अ‍ॅडमिन (Super Admin)';
+        return locale.t('Super Admin', 'सुपर अॅडमिन');
       case UserRole.organizer:
-        return 'नाट्य निर्माते (Organizer)';
+        return locale.t('Organizer', 'नाट्य निर्माते');
       default:
-        return 'प्रेक्षक (Audience)';
+        return locale.t('Audience', 'प्रेक्षक');
     }
   }
+
 
   Color _getRoleColor(UserRole role) {
     switch (role) {
@@ -92,17 +90,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
+    final locale = Provider.of<LocaleProvider>(context);
+    final s = S(locale);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('माझे प्रोफाईल (Profile Hub)',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            Text('Account, Roles & Preferences',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            Text(s.profile, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(
+              locale.t('Account & preferences', 'खाते व प्राधान्ये'),
+              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            ),
           ],
         ),
       ),
@@ -150,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
-                                  color: Colors.white,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                               SizedBox(height: 4),
@@ -195,7 +196,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     colors: [AppColors.surface, AppColors.surfaceLight],
                   ),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white12),
+                  border: Border.all(color: AppColors.surfaceBorder),
                 ),
                 child: Column(
                   children: [
@@ -230,7 +231,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 17,
-                                  color: Colors.white,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                               if (auth.userPhone.isNotEmpty) ...[
@@ -257,7 +258,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Divider(color: Colors.white12),
+                    const Divider(color: AppColors.surfaceBorder),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -267,7 +268,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             const Icon(Icons.verified_user, size: 16, color: AppColors.textSecondary),
                             const SizedBox(width: 6),
                             Text(
-                              _getRoleLabel(auth.role),
+                              _getRoleLabel(auth.role, locale),
                               style: TextStyle(
                                 color: _getRoleColor(auth.role),
                                 fontWeight: FontWeight.bold,
@@ -405,8 +406,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildSectionHeader('अ‍ॅप प्राधान्ये व सहाय्य (Preferences & Support)'),
             _buildMenuItem(
               icon: Icons.language,
-              title: 'भाषा (Language)',
-              subtitle: _selectedLanguage,
+              title: s.language,
+              subtitle: locale.isMarathi ? 'मराठी' : 'English',
               color: AppColors.cyan,
               onTap: _showLanguageDialog,
             ),
@@ -505,7 +506,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       color: AppColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Colors.white10),
+        side: const BorderSide(color: AppColors.surfaceBorder),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -536,7 +537,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),

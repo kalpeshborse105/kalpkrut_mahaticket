@@ -119,7 +119,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                   ),
                                   title: Text(
                                     title,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                                   ),
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,7 +184,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
             const SizedBox(height: 20),
             const Text(
               'प्रवेश करा (Sign In Required)',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -229,7 +229,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
             Text(
               _error ?? 'Error loading bookings',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
             ),
             const SizedBox(height: 16),
             OutlinedButton(
@@ -253,7 +253,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
             const SizedBox(height: 16),
             const Text(
               'कोणतीही सक्रिय तिकिटे आढळली नाहीत',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 6),
             const Text(

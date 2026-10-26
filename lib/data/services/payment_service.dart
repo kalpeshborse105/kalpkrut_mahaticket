@@ -155,10 +155,20 @@ class PaymentService {
           (orderJson['tickets'] as List?) ??
           const [];
 
+      final groupQr = orderJson['groupQrPayload']?.toString() ??
+          orderJson['group_qr_payload']?.toString() ??
+          verified['groupQrPayload']?.toString();
+
       final tickets = <TicketModel>[];
       for (final t in ticketsRaw) {
         if (t is Map) {
-          tickets.add(TicketModel.fromJson(Map<String, dynamic>.from(t)));
+          final map = Map<String, dynamic>.from(t);
+          if ((map['groupQrPayload'] == null && map['group_qr_payload'] == null) &&
+              groupQr != null &&
+              groupQr.isNotEmpty) {
+            map['groupQrPayload'] = groupQr;
+          }
+          tickets.add(TicketModel.fromJson(map));
         }
       }
 

@@ -4,6 +4,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/events_provider.dart';
+import '../../providers/locale_provider.dart';
+import '../../core/l10n/app_strings.dart';
 import '../../data/models/event_model.dart';
 import 'widgets/event_card.dart';
 import 'event_detail_screen.dart';
@@ -23,6 +25,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentNavIndex = 0;
   final TextEditingController _searchController = TextEditingController();
+  final GlobalKey<NavigatorState> _exploreNavKey = GlobalKey<NavigatorState>();
 
   @override
   void dispose() {
@@ -30,51 +33,66 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  void _openEvent(BuildContext context, EventModel event) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => EventDetailScreen(event: event)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
+    final s = S(Provider.of<LocaleProvider>(context));
 
-    // Build role-based dynamic navigation items and view stack
+    // Nested Explore navigator keeps bottom tabs visible on event/seat screens.
     List<Widget> views = [
-      _buildExploreView(context),
+      Navigator(
+        key: _exploreNavKey,
+        onGenerateRoute: (settings) {
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => _buildExploreView(context),
+          );
+        },
+      ),
       const MyTicketsScreen(),
     ];
 
     List<BottomNavigationBarItem> navItems = [
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.explore_rounded),
-        label: 'Explore',
+      BottomNavigationBarItem(
+        icon: const Icon(Icons.explore_rounded),
+        label: s.explore,
       ),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.confirmation_number_rounded),
-        label: 'My Tickets',
+      BottomNavigationBarItem(
+        icon: const Icon(Icons.confirmation_number_rounded),
+        label: s.myTickets,
       ),
     ];
 
     if (auth.isSuperAdmin) {
       views.add(const AdminDashboardScreen());
-      navItems.add(const BottomNavigationBarItem(
-        icon: Icon(Icons.admin_panel_settings_rounded),
-        label: 'Admin Hub',
+      navItems.add(BottomNavigationBarItem(
+        icon: const Icon(Icons.admin_panel_settings_rounded),
+        label: s.adminHub,
       ));
     } else if (auth.isOrganizer) {
       views.add(const OrganizerConsoleScreen());
-      navItems.add(const BottomNavigationBarItem(
-        icon: Icon(Icons.business_center_rounded),
-        label: 'Producer Hub',
+      navItems.add(BottomNavigationBarItem(
+        icon: const Icon(Icons.business_center_rounded),
+        label: s.producerHub,
       ));
     } else {
       views.add(const PostEventScreen());
-      navItems.add(const BottomNavigationBarItem(
-        icon: Icon(Icons.theater_comedy_rounded),
-        label: 'Partner',
+      navItems.add(BottomNavigationBarItem(
+        icon: const Icon(Icons.theater_comedy_rounded),
+        label: s.partner,
       ));
     }
 
     views.add(const ProfileScreen());
-    navItems.add(const BottomNavigationBarItem(
-      icon: Icon(Icons.person_rounded),
-      label: 'Profile',
+    navItems.add(BottomNavigationBarItem(
+      icon: const Icon(Icons.person_rounded),
+      label: s.profile,
     ));
 
     final safeIndex = _currentNavIndex.clamp(0, views.length - 1);
@@ -86,7 +104,14 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: safeIndex,
-        onTap: (index) => setState(() => _currentNavIndex = index),
+        type: BottomNavigationBarType.fixed,
+        onTap: (index) {
+          // Re-tapping Explore pops nested stack to home root (tabs stay visible).
+          if (index == 0 && _currentNavIndex == 0) {
+            _exploreNavKey.currentState?.popUntil((route) => route.isFirst);
+          }
+          setState(() => _currentNavIndex = index);
+        },
         items: navItems,
       ),
     );
@@ -115,24 +140,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Hero Featured Carousel with modern gradient badge
-            if (eventsProv.featuredEvents.isNotEmpty)
-              SliverToBoxAdapter(
-                child: _buildFeaturedCarousel(context, eventsProv.featuredEvents),
-              ),
+            // Admin-driven home rails (home_sections) — horizontal cards + bilingual titles
+            ..._buildAdminDrivenSections(context, eventsProv),
 
-            // Category Filter Pills
-            SliverToBoxAdapter(
-              child: _buildCategoryPills(eventsProv),
-            ),
-
-            // Ranked Trending Row ("Trending in Maharashtra")
-            if (eventsProv.events.isNotEmpty)
-              SliverToBoxAdapter(
-                child: _buildTrendingRankedRow(context, eventsProv.events),
-              ),
-
-            // Section Header
+            // All shows grid header
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
@@ -147,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         Text(
@@ -193,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 12),
                       const Text(
                         'No events found in this category',
-                        style: TextStyle(color: Colors.white, fontSize: 16),
+                        style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
                       ),
                       const SizedBox(height: 6),
                       TextButton(
@@ -271,7 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -330,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.textMuted),
@@ -352,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: TextField(
         controller: _searchController,
         onChanged: (val) => prov.setSearchQuery(val),
-        style: const TextStyle(color: Colors.white, fontSize: 14),
+        style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
         decoration: InputDecoration(
           hintText: 'Search Marathi Natak, Movies, Theatres...',
           hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
@@ -432,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? Colors.white : Colors.white70,
+                        color: isSelected ? Colors.white : AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(width: 4),
@@ -453,7 +464,219 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFeaturedCarousel(BuildContext context, List<EventModel> featured) {
+  List<Widget> _buildAdminDrivenSections(BuildContext context, EventsProvider eventsProv) {
+    final sections = eventsProv.homeSections;
+    final orderedKeys = sections.isNotEmpty
+        ? sections.map((s) => s.sectionKey).toList()
+        : ['hero', 'trending', 'categories', 'today', 'drama', 'music', 'venues'];
+
+    final slivers = <Widget>[];
+    for (final key in orderedKeys) {
+      if (!eventsProv.isSectionVisible(key)) continue;
+      switch (key) {
+        case 'hero':
+        case 'promoted':
+          final items = eventsProv.eventsForSection(key);
+          if (items.isNotEmpty) {
+            slivers.add(SliverToBoxAdapter(
+              child: _buildFeaturedCarousel(
+                context,
+                items,
+                title: eventsProv.sectionTitle(
+                  key,
+                  'Featured Shows',
+                  'विशेष आकर्षण',
+                  marathi: Provider.of<LocaleProvider>(context, listen: false).isMarathi,
+                ),
+              ),
+            ));
+          }
+          break;
+        case 'categories':
+          slivers.add(SliverToBoxAdapter(child: _buildCategoryPills(eventsProv)));
+          break;
+        case 'trending':
+        case 'today':
+        case 'drama':
+        case 'music':
+          final items = eventsProv.eventsForSection(key);
+          if (items.isNotEmpty) {
+            slivers.add(SliverToBoxAdapter(
+              child: _buildHorizontalEventRail(
+                context,
+                title: eventsProv.sectionTitle(
+                  key,
+                  key == 'trending' ? 'Top Trending' : key.toUpperCase(),
+                  key == 'trending' ? 'ट्रेंडिंग प्रयोग' : key,
+                  marathi: Provider.of<LocaleProvider>(context, listen: false).isMarathi,
+                ),
+                events: items,
+                ranked: key == 'trending',
+              ),
+            ));
+          }
+          break;
+        case 'venues':
+          if (eventsProv.venues.isNotEmpty) {
+            slivers.add(SliverToBoxAdapter(child: _buildVenuesRail(eventsProv)));
+          }
+          break;
+        default:
+          break;
+      }
+    }
+
+    // Ensure categories appear if admin list omitted them but pills are useful
+    if (!orderedKeys.contains('categories') && eventsProv.isSectionVisible('categories')) {
+      slivers.insert(1, SliverToBoxAdapter(child: _buildCategoryPills(eventsProv)));
+    }
+    return slivers;
+  }
+
+  Widget _buildHorizontalEventRail(
+    BuildContext context, {
+    required String title,
+    required List<EventModel> events,
+    bool ranked = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+          child: Row(
+            children: [
+              Icon(
+                ranked ? Icons.local_fire_department : Icons.theaters_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: ranked ? 190 : 250,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: events.length,
+            itemBuilder: (context, index) {
+              final ev = events[index];
+              if (ranked) {
+                return GestureDetector(
+                  onTap: () => _openEvent(context, ev),
+                  child: Container(
+                    width: 135,
+                    margin: const EdgeInsets.only(right: 14),
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          left: 20,
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedNetworkImage(
+                              imageUrl: ev.posterUrl,
+                              fit: BoxFit.cover,
+                              errorWidget: (context, url, error) => Container(color: AppColors.surfaceLight),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: 0,
+                          bottom: 6,
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              fontSize: 72,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary.withAlpha(220),
+                              shadows: const [Shadow(color: Colors.black, blurRadius: 10, offset: Offset(2, 2))],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return Container(
+                width: 148,
+                margin: const EdgeInsets.only(right: 12),
+                child: EventCard(
+                  event: ev,
+                  compact: true,
+                  onTap: () => _openEvent(context, ev),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVenuesRail(EventsProvider eventsProv) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+          child: Text(
+            eventsProv.sectionTitle(
+              'venues',
+              'Iconic Theatres',
+              'प्रसिद्ध नाट्यगृहे',
+              marathi: Provider.of<LocaleProvider>(context, listen: false).isMarathi,
+            ),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          ),
+        ),
+        SizedBox(
+          height: 92,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: eventsProv.venues.length,
+            itemBuilder: (context, index) {
+              final v = eventsProv.venues[index];
+              final name = (v['name_mr'] ?? v['name'] ?? 'Theatre').toString();
+              final city = (v['city'] ?? '').toString();
+              return Container(
+                width: 180,
+                margin: const EdgeInsets.only(right: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.surfaceBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Spacer(),
+                    Text(city, style: const TextStyle(color: AppColors.gold, fontSize: 11)),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeaturedCarousel(BuildContext context, List<EventModel> featured, {String? title}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -462,15 +685,21 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
-                children: [
-                  Icon(Icons.star_rounded, color: AppColors.gold, size: 20),
-                  SizedBox(width: 6),
-                  Text(
-                    'Featured Shows (विशेष आकर्षण)',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                ],
+              Flexible(
+                child: Row(
+                  children: [
+                    const Icon(Icons.star_rounded, color: AppColors.gold, size: 20),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        title ?? 'Featured Shows (विशेष आकर्षण)',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               Text(
                 '${featured.length} Hits',
@@ -487,14 +716,7 @@ class _HomeScreenState extends State<HomeScreen> {
             itemBuilder: (context, index) {
               final event = featured[index];
               return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => EventDetailScreen(event: event),
-                    ),
-                  );
-                },
+                onTap: () => _openEvent(context, event),
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                   decoration: BoxDecoration(
@@ -561,8 +783,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       ),
                                     Text(
-                                      event.title,
-                                      maxLines: 1,
+                                      event.displayTitle(
+                                        marathi: Provider.of<LocaleProvider>(context, listen: false).isMarathi,
+                                      ),
+                                      maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 17,
@@ -570,24 +794,17 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.white,
                                       ),
                                     ),
-                                    Text(
-                                      event.titleMr,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: AppColors.gold,
-                                      ),
-                                    ),
-                                    if (event.venueDisplayName.isNotEmpty) ...[
+                                    if (event.displayVenue(
+                                      marathi: Provider.of<LocaleProvider>(context, listen: false).isMarathi,
+                                    ).isNotEmpty) ...[
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${event.venueDisplayName} • ${event.venueCity}',
+                                        '${event.displayVenue(marathi: Provider.of<LocaleProvider>(context, listen: false).isMarathi)} • ${event.venueCity}',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontSize: 11,
-                                          color: AppColors.textMuted,
+                                          color: Colors.white70,
                                         ),
                                       ),
                                     ],
@@ -612,7 +829,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   children: [
                                     const Text(
                                       'Book Now',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
                                     ),
                                     if (event.minPriceRupees != null)
                                       Text(
@@ -638,92 +855,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTrendingRankedRow(BuildContext context, List<EventModel> events) {
-    final trending = events.take(6).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 20, 16, 12),
-          child: Row(
-            children: [
-              Icon(Icons.local_fire_department, color: AppColors.primary, size: 20),
-              SizedBox(width: 6),
-              Text(
-                'Top Trending in Maharashtra',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(
-          height: 190,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: trending.length,
-            itemBuilder: (context, index) {
-              final ev = trending[index];
-              return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => EventDetailScreen(event: ev)),
-                  );
-                },
-                child: Container(
-                  width: 135,
-                  margin: const EdgeInsets.only(right: 14),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        left: 20,
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: CachedNetworkImage(
-                            imageUrl: ev.posterUrl,
-                            fit: BoxFit.cover,
-                            errorWidget: (context, url, error) => Container(color: AppColors.surfaceLight),
-                          ),
-                        ),
-                      ),
-                      // Rank number (1, 2, 3...) BookMyShow style
-                      Positioned(
-                        left: 0,
-                        bottom: 6,
-                        child: Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            fontSize: 72,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white.withAlpha(220),
-                            shadows: const [
-                              Shadow(color: Colors.black, blurRadius: 10, offset: Offset(2, 2)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildEventCard(BuildContext context, EventModel event) {
-    return EventCard(event: event);
+    return EventCard(
+      event: event,
+      onTap: () => _openEvent(context, event),
+    );
   }
 
 
@@ -746,7 +882,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -761,7 +897,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: Text(
                     city,
                     style: TextStyle(
-                      color: isSelected ? AppColors.primary : Colors.white,
+                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),

@@ -70,7 +70,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 16),
               const Text(
                 'सक्रिय बुकिंग सापडले नाही (No active booking)',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
@@ -187,7 +187,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       Expanded(
                         child: Text(
                           _checkoutError!,
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                         ),
                       ),
                     ],
@@ -276,7 +276,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 Text(
@@ -307,7 +307,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -337,13 +337,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
           TextFormField(
             controller: _nameController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: AppColors.textPrimary),
             decoration: const InputDecoration(
               labelText: 'Full Name / संपूर्ण नाव',
               prefixIcon: Icon(Icons.person_outline, size: 20),
@@ -353,7 +353,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           const SizedBox(height: 10),
           TextFormField(
             controller: _emailController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: AppColors.textPrimary),
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
               labelText: 'Email Address / ईमेल',
@@ -365,7 +365,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           const SizedBox(height: 10),
           TextFormField(
             controller: _phoneController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: AppColors.textPrimary),
             keyboardType: TextInputType.phone,
             decoration: const InputDecoration(
               labelText: 'Mobile Number / मोबाइल नंबर',
@@ -395,7 +395,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               SizedBox(width: 8),
               Text(
                 'Apply Promo Code',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
             ],
           ),
@@ -406,7 +406,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: TextField(
                   controller: _couponController,
                   textCapitalization: TextCapitalization.characters,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: AppColors.textPrimary),
                   decoration: const InputDecoration(
                     hintText: 'e.g. MAHA50, NATAK10, CINEMA20',
                   ),
@@ -497,7 +497,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         children: [
           const Text(
             'Payment Breakdown',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 12),
           _breakdownRow('Ticket Face Value', '₹${faceValueRupees.toStringAsFixed(2)}'),
@@ -512,7 +512,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             children: [
               const Text(
                 'Grand Total / एकूण रक्कम',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
               Text(
                 '₹${grandTotalRupees.toStringAsFixed(2)}',
@@ -566,7 +566,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               children: [
                 const Text(
                   '100% Secure Razorpay Checkout',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
                 Text(
                   'Instant M-Ticket issuance with tamper-proof QR code',
