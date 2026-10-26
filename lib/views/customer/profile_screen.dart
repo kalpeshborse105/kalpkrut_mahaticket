@@ -368,6 +368,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
                 },
               ),
+              const SizedBox(height: 8),
+              _buildMenuItem(
+                icon: Icons.qr_code_scanner,
+                title: 'गेट क्यूआर स्कॅनर (Gate Pass Scanner)',
+                subtitle: 'Camera + manual ticket validation at entry',
+                color: AppColors.cyan,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const QrGateScannerScreen()),
+                  );
+                },
+              ),
             ],
 
             if (auth.isSuperAdmin) ...[
@@ -383,19 +396,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              _buildMenuItem(
-                icon: Icons.qr_code_scanner,
-                title: 'गेट क्यूआर स्कॅनर (Gate Pass Scanner)',
-                subtitle: 'Real-time ticket validation & entry check',
-                color: AppColors.cyan,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const QrGateScannerScreen()),
                   );
                 },
               ),

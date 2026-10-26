@@ -35,20 +35,27 @@ class TicketModel {
   bool get isCancelled => status == 'cancelled';
 
   factory TicketModel.fromJson(Map<String, dynamic> json) {
+    int asInt(dynamic v) => v is int ? v : int.tryParse('$v') ?? 0;
+    String asStr(dynamic a, dynamic b, [String fallback = '']) =>
+        (a ?? b ?? fallback).toString();
+
     return TicketModel(
-      id: json['id'] is int ? json['id'] : int.tryParse('${json['id']}') ?? 0,
-      ticketCode: json['ticket_code'] ?? '',
-      orderId: json['order_id'] ?? 0,
-      sessionId: json['session_id'] ?? 0,
-      ticketTypeId: json['ticket_type_id'] ?? 0,
-      seatId: json['seat_id'],
-      seatCode: json['seat_code'] ?? 'GA',
-      attendeeName: json['attendee_name'] ?? 'Guest',
-      faceValue: json['face_value'] ?? 0,
-      securityHash: json['security_hash'] ?? '',
-      qrPayload: json['qr_payload'] ?? '',
-      status: json['status'] ?? 'valid',
-      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      id: asInt(json['id']),
+      ticketCode: asStr(json['ticket_code'], json['ticketCode']),
+      orderId: asInt(json['order_id'] ?? json['orderId']),
+      sessionId: asInt(json['session_id'] ?? json['sessionId']),
+      ticketTypeId: asInt(json['ticket_type_id'] ?? json['ticketTypeId']),
+      seatId: json['seat_id'] ?? json['seatId'],
+      seatCode: asStr(json['seat_code'], json['seatCode'], 'GA'),
+      attendeeName: asStr(json['attendee_name'], json['attendeeName'], 'Guest'),
+      faceValue: asInt(json['face_value'] ?? json['faceValue']),
+      securityHash: asStr(json['security_hash'], json['securityHash']),
+      qrPayload: asStr(json['qr_payload'], json['qrPayload']),
+      status: asStr(json['status'], null, 'valid'),
+      createdAt: DateTime.tryParse(
+            asStr(json['created_at'], json['createdAt']),
+          ) ??
+          DateTime.now(),
     );
   }
 

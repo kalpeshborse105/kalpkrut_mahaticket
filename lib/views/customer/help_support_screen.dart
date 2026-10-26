@@ -19,7 +19,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     {
       'q': 'How do I download my ticket after booking?',
       'q_mr': 'बुकिंगनंतर तिकीट कसे डाउनलोड करावे?',
-      'a': 'Your digital M-Ticket with secure QR code is automatically saved in "My Tickets" and sent to your WhatsApp and email instantly after payment.',
+      'a': 'Your digital M-Ticket with secure QR code is saved in "My Tickets" after payment. Open that tab any time to show your QR at the gate. Email delivery uses the MahaTicket server when configured.',
       'policy': null,
     },
     {

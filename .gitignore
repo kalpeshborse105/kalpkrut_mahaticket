@@ -50,3 +50,4 @@ keystore.properties
 # Widget Preview related
 .widget_preview/
 .env
+.env.client

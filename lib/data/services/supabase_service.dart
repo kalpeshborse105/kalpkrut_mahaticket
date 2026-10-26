@@ -587,6 +587,69 @@ class SupabaseService {
     }
   }
 
+  /// Live confirmed-order totals for an organizer (fallback when settlements empty).
+  Future<Map<String, int>> getOrganizerTicketStats({int? organizerId}) async {
+    try {
+      var eventQuery = client.from('events').select('id');
+      if (organizerId != null) {
+        eventQuery = eventQuery.eq('organizer_id', organizerId);
+      }
+      final eventRows = await eventQuery;
+      final eventIds = (eventRows as List)
+          .map((e) => e['id'] is int ? e['id'] as int : int.tryParse('${e['id']}'))
+          .whereType<int>()
+          .toList();
+      if (eventIds.isEmpty) {
+        return {
+          'ticketCount': 0,
+          'grossPaise': 0,
+          'platformFeePaise': 0,
+          'taxPaise': 0,
+        };
+      }
+
+      final orders = await client
+          .from('orders')
+          .select('ticket_count, ticket_face_value_total, platform_fee_total, tax_total, order_status')
+          .inFilter('event_id', eventIds)
+          .eq('order_status', 'confirmed');
+
+      int ticketCount = 0;
+      int grossPaise = 0;
+      int platformFeePaise = 0;
+      int taxPaise = 0;
+      for (final o in (orders as List)) {
+        ticketCount += (o['ticket_count'] as int?) ??
+            int.tryParse('${o['ticket_count']}') ??
+            0;
+        grossPaise += (o['ticket_face_value_total'] as int?) ??
+            int.tryParse('${o['ticket_face_value_total']}') ??
+            0;
+        platformFeePaise += (o['platform_fee_total'] as int?) ??
+            int.tryParse('${o['platform_fee_total']}') ??
+            0;
+        taxPaise += (o['tax_total'] as int?) ??
+            int.tryParse('${o['tax_total']}') ??
+            0;
+      }
+
+      return {
+        'ticketCount': ticketCount,
+        'grossPaise': grossPaise,
+        'platformFeePaise': platformFeePaise,
+        'taxPaise': taxPaise,
+      };
+    } catch (e) {
+      debugPrint('Error fetching organizer ticket stats: $e');
+      return {
+        'ticketCount': 0,
+        'grossPaise': 0,
+        'platformFeePaise': 0,
+        'taxPaise': 0,
+      };
+    }
+  }
+
   /// Submit an event proposal (Partner With Us / आयोजक नोंदणी)
   Future<bool> submitPartnerLead(Map<String, dynamic> leadData) async {
     try {

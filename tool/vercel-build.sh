@@ -15,15 +15,17 @@ fi
 echo "Flutter version:"
 flutter --version
 
-# 2. Generate .env file dynamically from Vercel Environment Variables
-echo "Generating .env from environment variables..."
-cat << EOF > .env
+# 2. Generate client-only .env.client (never embed service-role / payment secrets)
+echo "Generating .env.client from public environment variables..."
+cat << EOF > .env.client
 NEXT_PUBLIC_APP_NAME="${NEXT_PUBLIC_APP_NAME:-MahaTicket}"
 NEXT_PUBLIC_DEFAULT_CITY="${NEXT_PUBLIC_DEFAULT_CITY:-Pune}"
+APP_URL="${APP_URL:-${NEXT_PUBLIC_API_BASE:-https://mahaticket.kalpkrutinfotech.com}}"
+NEXT_PUBLIC_API_BASE="${NEXT_PUBLIC_API_BASE:-${APP_URL:-https://mahaticket.kalpkrutinfotech.com}}"
 NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-${SUPABASE_URL:-https://hnseawulngdxbvltmthe.supabase.co}}"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY:-${SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhuc2Vhd3VsbmdkeGJ2bHRtdGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3MDc5NjIsImV4cCI6MjEwNjI4Mzk2Mn0.Jk1k0ZPMpldURgv37Hq1OfTjSY45GBcZ21qT_74SK9o}}"
-RAZORPAY_KEY_ID="${RAZORPAY_KEY_ID:-${NEXT_PUBLIC_RAZORPAY_KEY_ID:-rzp_test_Tqadzif5eTC5UB}}"
-NEXT_PUBLIC_RAZORPAY_KEY_ID="${NEXT_PUBLIC_RAZORPAY_KEY_ID:-${RAZORPAY_KEY_ID:-rzp_test_Tqadzif5eTC5UB}}"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY:-${SUPABASE_ANON_KEY:-}}"
+RAZORPAY_KEY_ID="${RAZORPAY_KEY_ID:-${NEXT_PUBLIC_RAZORPAY_KEY_ID:-}}"
+NEXT_PUBLIC_RAZORPAY_KEY_ID="${NEXT_PUBLIC_RAZORPAY_KEY_ID:-${RAZORPAY_KEY_ID:-}}"
 EOF
 
 echo "Resolving Flutter dependencies..."

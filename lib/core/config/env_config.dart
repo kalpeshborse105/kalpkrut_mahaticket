@@ -6,11 +6,16 @@ class EnvConfig {
 
   static Future<void> init() async {
     if (_initialized) return;
+    // Prefer client-only env (no service-role / payment secrets). Fall back to .env for local dev.
     try {
-      await dotenv.load(fileName: '.env');
-    } catch (e) {
-      // In production web or when using --dart-define, .env may not exist
-      debugPrint('dotenv loading note: $e');
+      await dotenv.load(fileName: '.env.client');
+    } catch (_) {
+      try {
+        await dotenv.load(fileName: '.env');
+      } catch (e) {
+        // Production web / --dart-define may omit dotenv files entirely.
+        debugPrint('dotenv loading note: $e');
+      }
     }
     _initialized = true;
   }
@@ -34,6 +39,25 @@ class EnvConfig {
   /// Razorpay Public Key ID (Client-safe key used for checkout modal)
   static String get razorpayKeyId =>
       _resolve('NEXT_PUBLIC_RAZORPAY_KEY_ID', defaultValue: _resolve('RAZORPAY_KEY_ID', defaultValue: 'rzp_test_Tqadzif5eTC5UB'));
+
+  /// Authoritative Next.js API base (TicketGhar payment / PDF / email).
+  /// Localhost APP_URL is remapped to production — Flutter clients cannot reach host loopback reliably.
+  static String get apiBaseUrl {
+    final raw = _resolve(
+      'NEXT_PUBLIC_API_BASE',
+      defaultValue: _resolve(
+        'APP_URL',
+        defaultValue: 'https://mahaticket.kalpkrutinfotech.com',
+      ),
+    ).trim().replaceAll(RegExp(r'/+$'), '');
+
+    if (raw.isEmpty ||
+        raw.contains('localhost') ||
+        raw.contains('127.0.0.1')) {
+      return 'https://mahaticket.kalpkrutinfotech.com';
+    }
+    return raw;
+  }
 
   /// Helper to resolve from Dart environment definition (--dart-define) or dotenv
   static String _resolve(String key, {String defaultValue = ''}) {

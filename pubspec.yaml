@@ -47,6 +47,8 @@ dependencies:
   url_launcher: ^6.3.3
   flutter_dotenv: ^6.0.1
   mobile_scanner: ^7.4.2
+  razorpay_flutter: ^1.4.7
+  web: ^1.1.2
 
 dev_dependencies:
   flutter_test:
@@ -71,7 +73,8 @@ flutter:
   uses-material-design: true
 
   assets:
-    - .env
+    # Client-safe public keys only — never bundle service-role / Razorpay secret / SMTP.
+    - .env.client
     - assets/images/
 
   # An image asset can refer to one or more resolution-specific "variants", see

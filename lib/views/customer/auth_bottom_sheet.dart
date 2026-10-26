@@ -354,6 +354,27 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
                   ),
                 ],
               ),
+
+              if (!_isSignUp) ...[
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _useOtp = !_useOtp;
+                      _otpSent = false;
+                    });
+                  },
+                  child: Text(
+                    _useOtp
+                        ? 'पासवर्डने प्रवेश (Use password instead)'
+                        : 'ईमेल OTP ने प्रवेश (Sign in with email OTP)',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.cyan,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

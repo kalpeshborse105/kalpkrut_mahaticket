@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/ticket_crypto.dart';
 import '../../data/services/supabase_service.dart';
@@ -13,10 +15,13 @@ class QrGateScannerScreen extends StatefulWidget {
 class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
   final TextEditingController _codeController = TextEditingController();
   final SupabaseService _supabaseService = SupabaseService();
+  MobileScannerController? _cameraController;
 
   bool _isVerifying = false;
+  bool _cameraEnabled = !kIsWeb;
   Map<String, dynamic>? _lastScanResult;
   String _selectedGate = 'Gate 1 (Main Entrance)';
+  String? _lastScannedRaw;
 
   final List<String> _gates = [
     'Gate 1 (Main Entrance)',
@@ -26,14 +31,26 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    if (_cameraEnabled) {
+      _cameraController = MobileScannerController(
+        detectionSpeed: DetectionSpeed.normal,
+        facing: CameraFacing.back,
+      );
+    }
+  }
+
+  @override
   void dispose() {
     _codeController.dispose();
+    _cameraController?.dispose();
     super.dispose();
   }
 
   Future<void> _verifyTicket(String rawInput) async {
     final input = rawInput.trim();
-    if (input.isEmpty) return;
+    if (input.isEmpty || _isVerifying) return;
 
     setState(() {
       _isVerifying = true;
@@ -43,8 +60,7 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
     try {
       String ticketCode = input;
 
-      // Check if it's a signed MTSEC QR payload (TicketGhar / MahaTicket standard)
-      if (input.startsWith('MTSEC:v1:')) {
+      if (input.startsWith('MTSEC:v1:') || input.startsWith('MTGRP:v1:')) {
         final parts = input.split(':');
         if (parts.length >= 3) {
           ticketCode = parts[2];
@@ -64,7 +80,6 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
         ticketCode = verified['ticketCode'];
       }
 
-      // Check with Supabase database
       final result = await _supabaseService.validateAndScanTicket(
         ticketCode: ticketCode,
         gateName: _selectedGate,
@@ -86,18 +101,47 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
     }
   }
 
+  void _onDetect(BarcodeCapture capture) {
+    if (_isVerifying) return;
+    final barcodes = capture.barcodes;
+    if (barcodes.isEmpty) return;
+    final raw = barcodes.first.rawValue;
+    if (raw == null || raw.isEmpty) return;
+    if (raw == _lastScannedRaw) return;
+    _lastScannedRaw = raw;
+    _codeController.text = raw;
+    _verifyTicket(raw);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Auditorium Gate Validator'),
+        actions: [
+          if (!kIsWeb)
+            IconButton(
+              tooltip: _cameraEnabled ? 'Hide camera' : 'Show camera',
+              icon: Icon(_cameraEnabled ? Icons.videocam_off : Icons.qr_code_scanner),
+              onPressed: () {
+                setState(() {
+                  _cameraEnabled = !_cameraEnabled;
+                  if (_cameraEnabled && _cameraController == null) {
+                    _cameraController = MobileScannerController(
+                      detectionSpeed: DetectionSpeed.normal,
+                      facing: CameraFacing.back,
+                    );
+                  }
+                });
+              },
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Gate Selection dropdown
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -131,7 +175,26 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Scanner Input Card
+            if (_cameraEnabled && _cameraController != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SizedBox(
+                  height: 240,
+                  width: double.infinity,
+                  child: MobileScanner(
+                    controller: _cameraController,
+                    onDetect: _onDetect,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Point camera at MTSEC / MTGRP / ticket QR. Duplicate scans are rejected by the server.',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -154,7 +217,7 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
                           controller: _codeController,
                           style: const TextStyle(color: Colors.white),
                           decoration: const InputDecoration(
-                            hintText: 'e.g. TK-2026-84920 or MHTK|...',
+                            hintText: 'e.g. MT-TK-… or MTSEC:v1:…',
                             prefixIcon: Icon(Icons.qr_code, size: 20),
                           ),
                           onSubmitted: _verifyTicket,
@@ -180,8 +243,6 @@ class _QrGateScannerScreenState extends State<QrGateScannerScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Result Display Card
             if (_lastScanResult != null) _buildResultCard(),
           ],
         ),

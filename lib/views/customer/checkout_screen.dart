@@ -602,50 +602,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     try {
       final seatIds = booking.selectedSeats.map((s) => s.id).toList();
+      final event = booking.selectedEvent;
 
-      // Initiate verified transaction ID
-      final paymentTxId = 'pay_${DateTime.now().millisecondsSinceEpoch}_${booking.holdToken.substring(5, 11)}';
-      final orderRefId = 'rzp_ord_${DateTime.now().millisecondsSinceEpoch}';
-
-      final result = await PaymentService().confirmBookingWithPayment(
+      // Authoritative path: create-order → Razorpay → server HMAC verify (never fabricate pay_ IDs)
+      final result = await PaymentService().checkoutWithRazorpay(
         sessionId: sessionId,
         holdToken: booking.holdToken,
         seatIds: seatIds,
         userEmail: _emailController.text.trim(),
         userPhone: _phoneController.text.trim(),
         userName: _nameController.text.trim(),
+        eventTitle: event?.title ?? 'MahaTicket',
         couponCode: _appliedCouponCode,
-        razorpayOrderId: orderRefId,
-        razorpayPaymentId: paymentTxId,
       );
 
       if (result.success && result.issuedTickets.isNotEmpty) {
         if (context.mounted) {
-          final event = booking.selectedEvent;
           final session = booking.selectedSession;
           final dateStr = session != null ? DateFormat('EEE, d MMM yyyy').format(session.sessionStartTime) : null;
           final timeStr = session != null ? DateFormat('hh:mm a').format(session.sessionStartTime) : null;
 
-          final createdOrder = OrderModel(
-            id: result.orderId ?? 0,
-            orderNumber: result.orderNumber ?? 'MHTK-2026',
-            userId: 1,
-            userEmail: _emailController.text.trim(),
-            userPhone: _phoneController.text.trim(),
-            userName: _nameController.text.trim(),
-            eventId: event?.id ?? 0,
-            sessionId: sessionId,
-            ticketCount: seatIds.length,
-            ticketFaceValueTotal: 0,
-            platformFeeTotal: 0,
-            taxTotal: 0,
-            discountTotal: _appliedDiscountPaise,
-            grandTotal: grandTotalPaise,
-            paymentStatus: 'captured',
-            orderStatus: 'confirmed',
-            razorpayPaymentId: paymentTxId,
-            createdAt: DateTime.now(),
-          );
+          final createdOrder = result.order ??
+              OrderModel(
+                id: result.orderId ?? 0,
+                orderNumber: result.orderNumber ?? 'MT-ORDER',
+                userId: 0,
+                userEmail: _emailController.text.trim(),
+                userPhone: _phoneController.text.trim(),
+                userName: _nameController.text.trim(),
+                eventId: event?.id ?? 0,
+                sessionId: sessionId,
+                ticketCount: seatIds.length,
+                ticketFaceValueTotal: 0,
+                platformFeeTotal: 0,
+                taxTotal: 0,
+                discountTotal: _appliedDiscountPaise,
+                grandTotal: grandTotalPaise,
+                paymentStatus: 'captured',
+                orderStatus: 'confirmed',
+                razorpayPaymentId: result.paymentId,
+                createdAt: DateTime.now(),
+              );
 
           // Clear local booking selection since it's confirmed
           booking.releaseHold();
